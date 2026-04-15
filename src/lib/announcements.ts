@@ -102,6 +102,15 @@ function isWithinNextHours(date: Date, now: Date, hours: number) {
   return diff >= 0 && diff <= hours * 60 * 60 * 1000;
 }
 
+function normalizeAnnouncementType(
+  value: string | null | undefined
+): AppAnnouncement["type"] {
+  if (value === "evento") return "evento";
+  if (value === "oracion") return "oracion";
+  if (value === "en-vivo") return "en-vivo";
+  return "general";
+}
+
 export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
   const supabase = await createClient();
   const churchInfo = await getChurchInfo();
@@ -132,17 +141,17 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
     .order("created_at", { ascending: false })
     .limit(5);
 
-  const manualAnnouncements = ((manualData ?? []) as ManualAnnouncement[]).map(
-    (item) => ({
-      id: `manual-${item.id}`,
-      title: item.title,
-      description: item.description ?? "",
-      type: (item.type as AppAnnouncement["type"]) || "general",
-      source: "manual" as const,
-      createdAt: item.created_at,
-      isPriority: false,
-    })
-  );
+  const manualAnnouncements: AppAnnouncement[] = (
+    (manualData ?? []) as ManualAnnouncement[]
+  ).map((item) => ({
+    id: `manual-${item.id}`,
+    title: item.title,
+    description: item.description ?? "",
+    type: normalizeAnnouncementType(item.type),
+    source: "manual",
+    createdAt: item.created_at,
+    isPriority: false,
+  }));
 
   const regularCandidates = [
     {
@@ -150,28 +159,28 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       title: "Servicio dominical próximo",
       date: getNextOccurrenceWithTime(0, sundayTime.hour, sundayTime.minute, now),
       descriptionBase: "Te esperamos en Comunidad VID.",
-      type: "evento" as const,
+      type: "evento" as AppAnnouncement["type"],
     },
     {
       id: "regular-tuesday-prayer",
       title: "Oración en línea próxima",
       date: getNextOccurrenceWithTime(2, prayerTime.hour, prayerTime.minute, now),
       descriptionBase: "Nuestra próxima noche de oración será en línea.",
-      type: "oracion" as const,
+      type: "oracion" as AppAnnouncement["type"],
     },
     {
       id: "regular-wednesday-leadership",
       title: "Grupo de liderazgo próximo",
       date: getNextOccurrenceWithTime(3, leadershipTime.hour, leadershipTime.minute, now),
       descriptionBase: "Espacio de formación y dirección para líderes.",
-      type: "general" as const,
+      type: "general" as AppAnnouncement["type"],
     },
     {
       id: "regular-thursday-prayer",
       title: "Oración en línea próxima",
       date: getNextOccurrenceWithTime(4, prayerTime.hour, prayerTime.minute, now),
       descriptionBase: "Nuestra próxima noche de oración será en línea.",
-      type: "oracion" as const,
+      type: "oracion" as AppAnnouncement["type"],
     },
   ];
 
@@ -182,7 +191,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       title: item.title,
       description: `${item.descriptionBase} ${formatAnnouncementDate(item.date)}.`,
       type: item.type,
-      source: "regular_event" as const,
+      source: "regular_event",
       createdAt: item.date.toISOString(),
       isPriority: isWithinNextHours(item.date, now, 12),
     }));
@@ -203,13 +212,17 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       const baseDate = new Date(event.event_date);
       const startsAt = buildDateTime(baseDate, parsed.hour, parsed.minute);
 
+      const type: AppAnnouncement["type"] = event.is_streamable
+        ? "en-vivo"
+        : "evento";
+
       return {
         id: `special-${event.id}`,
         title: event.title,
         description:
           event.description ||
           `Evento programado para ${formatAnnouncementDate(startsAt)}.`,
-        type: event.is_streamable ? "en-vivo" : "evento",
+        type,
         source: "special_event" as const,
         createdAt: startsAt.toISOString(),
         isPriority: isWithinNextHours(startsAt, now, 12),
@@ -219,7 +232,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
     .filter((item) => isWithinNextHours(item.startsAt, now, 72))
     .map(({ startsAt, ...rest }) => rest);
 
-  const merged = [
+  const merged: AppAnnouncement[] = [
     ...manualAnnouncements,
     ...regularAnnouncements,
     ...specialAnnouncements,
