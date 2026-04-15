@@ -163,7 +163,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       title: item.title,
       description: item.description ?? "",
       type,
-      source: "manual",
+      source: "manual" as const,
       createdAt: item.created_at,
       isPriority: false,
       href: getManualHref(type),
@@ -184,7 +184,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       date: sundayStart,
       descriptionBase:
         "Te esperamos en Comunidad VID este domingo de 10:00 AM a 1:00 PM.",
-      type: "evento" as AppAnnouncement["type"],
+      type: "evento" as const,
       href: "/eventos",
     },
     {
@@ -193,7 +193,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       date: tuesdayPrayerStart,
       descriptionBase:
         "Nuestra noche de oración será el martes de 9:00 PM a 10:00 PM.",
-      type: "oracion" as AppAnnouncement["type"],
+      type: "oracion" as const,
       href: "/eventos",
     },
     {
@@ -202,7 +202,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       date: wednesdayLeadershipStart,
       descriptionBase:
         "Espacio de formación y dirección para líderes, miércoles de 8:00 PM a 9:00 PM.",
-      type: "general" as AppAnnouncement["type"],
+      type: "general" as const,
       href: "/eventos",
     },
     {
@@ -211,7 +211,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       date: thursdayPrayerStart,
       descriptionBase:
         "Nuestra noche de oración será el jueves de 9:00 PM a 10:00 PM.",
-      type: "oracion" as AppAnnouncement["type"],
+      type: "oracion" as const,
       href: "/eventos",
     },
   ];
@@ -223,7 +223,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       title: item.title,
       description: `${item.descriptionBase} ${formatAnnouncementDate(item.date)}.`,
       type: item.type,
-      source: "regular_event",
+      source: "regular_event" as const,
       createdAt: item.date.toISOString(),
       isPriority: isWithinNextHours(item.date, now, 12),
       href: item.href,
@@ -263,7 +263,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
           event.description ||
           `Evento programado para ${formatAnnouncementDate(startsAt)}.`,
         type,
-        source: "special_event",
+        source: "special_event" as const,
         createdAt: startsAt.toISOString(),
         isPriority: isWithinNextHours(startsAt, now, 12),
         href: event.is_streamable ? "/en-vivo" : "/eventos",
@@ -281,7 +281,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       description:
         event.description ||
         `${formatSpecialEventDate(event)}. Horario por confirmar.`,
-      type: "especial" as AppAnnouncement["type"],
+      type: "especial" as const,
       source: "special_event" as const,
       createdAt: event.created_at,
       isPriority: true,
