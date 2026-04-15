@@ -121,6 +121,11 @@ export default async function EventsSection() {
 
   const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
 
+  const sundayDate = getNextOccurrence(0, now, 10, 0);
+  const tuesdayPrayerDate = getNextOccurrence(2, now, 21, 0);
+  const wednesdayLeadershipDate = getNextOccurrence(3, now, 20, 0);
+  const thursdayPrayerDate = getNextOccurrence(4, now, 21, 0);
+
   const regularEvents: RegularHomeEvent[] = [
     {
       id: "regular-sunday",
@@ -128,57 +133,56 @@ export default async function EventsSection() {
       description:
         "Nuestra reunión principal de adoración, enseñanza bíblica y comunidad.",
       location: serviceAddress,
-      date: getNextOccurrence(0, now, 10, 0),
-      displayDate: formatCardDate(getNextOccurrence(0, now, 10, 0)),
+      date: sundayDate,
+      displayDate: formatCardDate(sundayDate),
       displayTime: "Domingos · 10:00 AM a 1:00 PM · Presencial",
       badge: "Servicio",
       badgeClass: "bg-blue-100 text-blue-700",
-      modeIcon: "location",
+      modeIcon: "location" as const,
     },
     {
       id: "regular-tuesday-prayer",
       title: "Noche de oración",
       description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
       location: "En línea",
-      date: getNextOccurrence(2, now, 21, 0),
-      displayDate: formatCardDate(getNextOccurrence(2, now, 21, 0)),
+      date: tuesdayPrayerDate,
+      displayDate: formatCardDate(tuesdayPrayerDate),
       displayTime: "Martes · 9:00 PM a 10:00 PM · En línea",
       badge: "Oración",
       badgeClass: "bg-emerald-100 text-emerald-700",
-      modeIcon: "online",
+      modeIcon: "online" as const,
     },
     {
       id: "regular-wednesday-leadership",
       title: "Grupo de liderazgo",
       description: "Espacio de formación, dirección y crecimiento para líderes.",
       location: "En línea",
-      date: getNextOccurrence(3, now, 20, 0),
-      displayDate: formatCardDate(getNextOccurrence(3, now, 20, 0)),
+      date: wednesdayLeadershipDate,
+      displayDate: formatCardDate(wednesdayLeadershipDate),
       displayTime: "Miércoles · 8:00 PM a 9:00 PM · En línea",
       badge: "Liderazgo",
       badgeClass: "bg-amber-100 text-amber-700",
-      modeIcon: "online",
+      modeIcon: "online" as const,
     },
     {
       id: "regular-thursday-prayer",
       title: "Noche de oración",
       description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
       location: "En línea",
-      date: getNextOccurrence(4, now, 21, 0),
-      displayDate: formatCardDate(getNextOccurrence(4, now, 21, 0)),
+      date: thursdayPrayerDate,
+      displayDate: formatCardDate(thursdayPrayerDate),
       displayTime: "Jueves · 9:00 PM a 10:00 PM · En línea",
       badge: "Oración",
       badgeClass: "bg-emerald-100 text-emerald-700",
-      modeIcon: "online",
+      modeIcon: "online" as const,
     },
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const nextRegularEvent = regularEvents[0] ?? null;
 
-  const { data } = await supabase
-    .from("events")
-    .select("*")
-    .order("event_date", { ascending: true });
+  const { data } = await supabase.from("events").select("*").order("event_date", {
+    ascending: true,
+  });
 
   const rawSpecialEvents = (data ?? []) as EventRow[];
 
@@ -193,17 +197,15 @@ export default async function EventsSection() {
 
   const undatedSpecialEvents = rawSpecialEvents.filter((event) => !event.event_date);
 
-  const homeSpecialEvents = [
-    ...datedSpecialEvents.slice(0, 1),
-    ...undatedSpecialEvents,
-  ].slice(0, 2);
+  const homeSpecialEvents = [...datedSpecialEvents.slice(0, 1), ...undatedSpecialEvents].slice(
+    0,
+    2
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-xl font-semibold text-stone-950">
-          Próximos eventos
-        </h3>
+        <h3 className="text-xl font-semibold text-stone-950">Próximos eventos</h3>
 
         <Link
           href="/eventos"
@@ -260,9 +262,7 @@ export default async function EventsSection() {
                       ) : (
                         <MapPin size={15} className="text-stone-400" />
                       )}
-                      <span className="line-clamp-1">
-                        {nextRegularEvent.location}
-                      </span>
+                      <span className="line-clamp-1">{nextRegularEvent.location}</span>
                     </div>
 
                     <p className="pt-1 leading-6 text-stone-600">
@@ -320,9 +320,7 @@ export default async function EventsSection() {
                   ) : null}
                 </div>
 
-                <h4 className="text-lg font-semibold text-stone-900">
-                  {event.title}
-                </h4>
+                <h4 className="text-lg font-semibold text-stone-900">{event.title}</h4>
 
                 <div className="mt-3 space-y-2 text-sm text-stone-600">
                   <div className="flex items-center gap-2">
