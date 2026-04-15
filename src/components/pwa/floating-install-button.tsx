@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Share2, PlusSquare, Smartphone, X } from "lucide-react";
+import {
+  Download,
+  Share2,
+  PlusSquare,
+  Smartphone,
+  X,
+  ExternalLink,
+} from "lucide-react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -29,6 +36,7 @@ export default function FloatingInstallButton() {
     useState<BeforeInstallPromptEvent | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [compact, setCompact] = useState(false);
 
   const ios = useMemo(() => isIos(), []);
   const installed = useMemo(() => isStandalone(), []);
@@ -44,7 +52,12 @@ export default function FloatingInstallButton() {
       setDeferredPrompt(event as BeforeInstallPromptEvent);
     };
 
+    const onScroll = () => {
+      setCompact(window.scrollY > 180);
+    };
+
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     const timer = window.setTimeout(() => {
       setVisible(true);
@@ -52,6 +65,7 @@ export default function FloatingInstallButton() {
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("scroll", onScroll);
       window.clearTimeout(timer);
     };
   }, [installed]);
@@ -83,14 +97,23 @@ export default function FloatingInstallButton() {
   return (
     <>
       <div className="fixed bottom-24 right-4 z-[125] sm:right-6">
-        <div className="flex items-center gap-2 rounded-full border border-white/60 bg-[#f8f6f2]/95 px-3 py-2 shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+        <div
+          className={`flex items-center gap-2 border border-white/60 bg-[#f8f6f2]/95 shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-all duration-300 ${
+            compact
+              ? "rounded-full px-2 py-2"
+              : "rounded-full px-3 py-2"
+          }`}
+        >
           <button
             type="button"
             onClick={handleInstall}
-            className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-800 active:scale-95"
+            className={`inline-flex items-center gap-2 rounded-full bg-stone-900 text-white transition hover:bg-stone-800 active:scale-95 ${
+              compact ? "px-3 py-2 text-xs" : "px-4 py-2 text-sm font-medium"
+            }`}
+            aria-label="Instalar app"
           >
             <Download size={15} />
-            Instalar app
+            {compact ? "Instalar" : "Instalar app"}
           </button>
 
           <button
@@ -155,13 +178,24 @@ export default function FloatingInstallButton() {
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => setShowHelp(false)}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
-                >
-                  Entendido
-                </button>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowHelp(false)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
+                  >
+                    Entendido
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-stone-900 shadow-sm ring-1 ring-stone-200 transition hover:bg-stone-50"
+                  >
+                    <ExternalLink size={16} />
+                    Volver a intentar
+                  </button>
+                </div>
               </div>
             </div>
           </div>

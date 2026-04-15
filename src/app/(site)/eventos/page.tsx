@@ -19,12 +19,14 @@ type EventRow = {
   title: string;
   description: string | null;
   location: string | null;
-  event_date: string;
+  event_date: string | null;
   event_time: string | null;
   image_url: string | null;
   is_online: boolean | null;
   is_streamable: boolean | null;
   stream_url: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
 };
 
 type EventType = "servicio" | "oracion" | "liderazgo";
@@ -60,7 +62,6 @@ function getNextOccurrence(
   result.setDate(result.getDate() + diff);
   result.setHours(eventHour, eventMinute, 0, 0);
 
-  // Si es hoy pero ya pasó la hora de inicio, entonces sí lo manda a la próxima semana
   if (result.getTime() < baseDate.getTime()) {
     result.setDate(result.getDate() + 7);
   }
@@ -143,6 +144,16 @@ function getSpecialEventImage(event: EventRow, index: number) {
   return gallery[index % gallery.length] || churchMedia.heroImage;
 }
 
+function formatSpecialEventDate(event: EventRow) {
+  if (!event.event_date) return "Próximamente en junio";
+  return formatEventDate(event.event_date);
+}
+
+function formatSpecialEventTime(event: EventRow) {
+  if (!event.event_time?.trim()) return "Horario por confirmar";
+  return event.event_time;
+}
+
 export default async function EventsPage() {
   const supabase = await createClient();
   const churchInfo = await getChurchInfo();
@@ -195,41 +206,49 @@ export default async function EventsPage() {
   ];
 
   const upcomingRegularEvents = recurringEvents
-  .map((event) => {
-    let hour = 0;
-    let minute = 0;
+    .map((event) => {
+      let hour = 0;
+      let minute = 0;
 
-    if (event.type === "servicio") {
-      hour = 10;
-      minute = 0;
-    }
+      if (event.type === "servicio") {
+        hour = 10;
+        minute = 0;
+      }
 
-    if (event.type === "oracion") {
-      hour = 21;
-      minute = 0;
-    }
+      if (event.type === "oracion") {
+        hour = 21;
+        minute = 0;
+      }
 
-    if (event.type === "liderazgo") {
-      hour = 20;
-      minute = 0;
-    }
+      if (event.type === "liderazgo") {
+        hour = 20;
+        minute = 0;
+      }
 
-    return {
-      ...event,
-      date: getNextOccurrence(event.weekday, now, hour, minute),
-    };
-  })
-  .sort((a, b) => a.date.getTime() - b.date.getTime());
+      return {
+        ...event,
+        date: getNextOccurrence(event.weekday, now, hour, minute),
+      };
+    })
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const { data } = await supabase
     .from("events")
     .select("*")
     .order("event_date", { ascending: true });
 
-  const specialEvents = ((data ?? []) as EventRow[]).filter((event) => {
-    const eventDate = new Date(event.event_date);
-    return eventDate >= new Date(now.toDateString());
-  });
+  const specialEvents = ((data ?? []) as EventRow[])
+    .filter((event) => {
+      if (!event.event_date) return true;
+      const eventDate = new Date(event.event_date);
+      return eventDate >= new Date(now.toDateString());
+    })
+    .sort((a, b) => {
+      if (!a.event_date && !b.event_date) return 0;
+      if (!a.event_date) return 1;
+      if (!b.event_date) return -1;
+      return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+    });
 
   const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
 
@@ -440,15 +459,13 @@ export default async function EventsPage() {
                       <div className="mt-3 space-y-2 text-sm text-stone-600">
                         <div className="flex items-center gap-2">
                           <CalendarDays size={15} className="text-stone-400" />
-                          <span>{formatEventDate(event.event_date)}</span>
+                          <span>{formatSpecialEventDate(event)}</span>
                         </div>
 
-                        {event.event_time ? (
-                          <div className="flex items-center gap-2">
-                            <Clock3 size={15} className="text-stone-400" />
-                            <span>{event.event_time}</span>
-                          </div>
-                        ) : null}
+                        <div className="flex items-center gap-2">
+                          <Clock3 size={15} className="text-stone-400" />
+                          <span>{formatSpecialEventTime(event)}</span>
+                        </div>
 
                         <div className="flex items-center gap-2">
                           {event.is_online ? (
@@ -456,7 +473,7 @@ export default async function EventsPage() {
                           ) : (
                             <MapPin size={15} className="text-stone-400" />
                           )}
-                          <span>{event.location || "Por definir"}</span>
+                          <span>{event.location || "Sede por confirmar"}</span>
                         </div>
                       </div>
 
@@ -476,6 +493,17 @@ export default async function EventsPage() {
                           >
                             <MonitorPlay size={16} />
                             Solicitar acceso
+                          </Link>
+                        ) : null}
+
+                        {event.cta_url && event.cta_label ? (
+                          <Link
+                            href={event.cta_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
+                          >
+                            {event.cta_label}
                           </Link>
                         ) : null}
                       </div>

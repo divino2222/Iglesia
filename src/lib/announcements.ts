@@ -5,11 +5,13 @@ export type AppAnnouncement = {
   id: string;
   title: string;
   description: string;
-  type: "general" | "evento" | "oracion" | "en-vivo";
+  type: "general" | "evento" | "oracion" | "en-vivo" | "especial";
   source: "manual" | "regular_event" | "special_event";
   createdAt: string;
   isPriority?: boolean;
   href: string;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
 };
 
 type ManualAnnouncement = {
@@ -26,11 +28,13 @@ type SpecialEvent = {
   title: string;
   description: string | null;
   location: string | null;
-  event_date: string;
+  event_date: string | null;
   event_time: string | null;
   is_online: boolean | null;
   is_streamable: boolean | null;
   created_at: string;
+  cta_label: string | null;
+  cta_url: string | null;
 };
 
 function getMexicoCityNow() {
@@ -109,6 +113,7 @@ function normalizeAnnouncementType(
   if (value === "evento") return "evento";
   if (value === "oracion") return "oracion";
   if (value === "en-vivo") return "en-vivo";
+  if (value === "especial") return "especial";
   return "general";
 }
 
@@ -117,12 +122,23 @@ function getManualHref(type: AppAnnouncement["type"]) {
     case "en-vivo":
       return "/en-vivo";
     case "evento":
+    case "especial":
       return "/eventos";
     case "oracion":
       return "/oracion";
     default:
       return "/";
   }
+}
+
+function formatSpecialEventDate(event: SpecialEvent) {
+  if (!event.event_date) return "Próximamente en junio";
+
+  return new Date(event.event_date).toLocaleDateString("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
@@ -151,6 +167,8 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       createdAt: item.created_at,
       isPriority: false,
       href: getManualHref(type),
+      ctaLabel: null,
+      ctaUrl: null,
     };
   });
 
@@ -209,31 +227,34 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       createdAt: item.date.toISOString(),
       isPriority: isWithinNextHours(item.date, now, 12),
       href: item.href,
+      ctaLabel: null,
+      ctaUrl: null,
     }));
 
   const { data: specialData } = await supabase
     .from("events")
     .select(
-      "id,title,description,location,event_date,event_time,is_online,is_streamable,created_at"
+      "id,title,description,location,event_date,event_time,is_online,is_streamable,created_at,cta_label,cta_url"
     )
     .order("event_date", { ascending: true })
-    .limit(10);
+    .limit(20);
 
   const specialEvents = (specialData ?? []) as SpecialEvent[];
 
-  const specialAnnouncements: AppAnnouncement[] = specialEvents
+  const datedSpecialAnnouncements: AppAnnouncement[] = specialEvents
+    .filter((event) => !!event.event_date)
     .map((event) => {
       const parsed = parseTimeTo24Hour(event.event_time, 19, 0);
-      const baseDate = new Date(event.event_date);
+      const baseDate = new Date(event.event_date as string);
       const startsAt = buildDateTime(baseDate, parsed.hour, parsed.minute);
 
       const type: AppAnnouncement["type"] = event.is_streamable
         ? "en-vivo"
         : event.is_online
         ? "oracion"
+        : event.cta_label
+        ? "especial"
         : "evento";
-
-      const href = event.is_streamable ? "/en-vivo" : "/eventos";
 
       return {
         id: `special-${event.id}`,
@@ -242,20 +263,38 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
           event.description ||
           `Evento programado para ${formatAnnouncementDate(startsAt)}.`,
         type,
-        source: "special_event" as const,
+        source: "special_event",
         createdAt: startsAt.toISOString(),
         isPriority: isWithinNextHours(startsAt, now, 12),
-        href,
-        startsAt,
+        href: event.is_streamable ? "/en-vivo" : "/eventos",
+        ctaLabel: event.cta_label,
+        ctaUrl: event.cta_url,
       };
     })
-    .filter((item) => isWithinNextHours(item.startsAt, now, 72))
-    .map(({ startsAt, ...rest }) => rest);
+    .filter((item) => isWithinNextHours(new Date(item.createdAt), now, 72));
+
+  const undatedSpecialAnnouncements: AppAnnouncement[] = specialEvents
+    .filter((event) => !event.event_date)
+    .map((event) => ({
+      id: `special-undated-${event.id}`,
+      title: event.title,
+      description:
+        event.description ||
+        `${formatSpecialEventDate(event)}. Horario por confirmar.`,
+      type: "especial" as AppAnnouncement["type"],
+      source: "special_event" as const,
+      createdAt: event.created_at,
+      isPriority: true,
+      href: "/eventos",
+      ctaLabel: event.cta_label,
+      ctaUrl: event.cta_url,
+    }));
 
   const merged: AppAnnouncement[] = [
     ...manualAnnouncements,
     ...regularAnnouncements,
-    ...specialAnnouncements,
+    ...datedSpecialAnnouncements,
+    ...undatedSpecialAnnouncements,
   ];
 
   return merged.sort((a, b) => {

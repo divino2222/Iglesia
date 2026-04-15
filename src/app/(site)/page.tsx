@@ -23,7 +23,7 @@ export default function HomePage() {
       <div className="space-y-8 px-4 py-6">
         <HomeHero />
 
-        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+        <section className="rounded-[34px] border border-white/60 bg-white/70 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
           <SectionHeading
             eyebrow="Conecta"
             title="Transmisión y acceso rápido"
@@ -35,7 +35,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+        <section className="rounded-[34px] border border-white/60 bg-white/70 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
           <SectionHeading
             eyebrow="Te esperamos"
             title="Reúnete con nosotros"
@@ -47,7 +47,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+        <section className="rounded-[34px] border border-white/60 bg-white/70 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
           <SectionHeading
             eyebrow="Galería"
             title="Nuestra comunidad"
@@ -56,16 +56,16 @@ export default function HomePage() {
           <ChurchGalleryPreview />
         </section>
 
-        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+        <section className="rounded-[34px] border border-white/60 bg-white/70 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
           <SectionHeading
             eyebrow="Agenda"
             title="Próximos eventos"
-            subtitle="Mantente al día con reuniones regulares y actividades."
+            subtitle="Primero verás el evento más cercano y después los especiales de la comunidad."
           />
           <EventsSection />
         </section>
 
-        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+        <section className="rounded-[34px] border border-white/60 bg-white/70 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
           <SectionHeading
             eyebrow="Escucha"
             title="Últimas predicaciones"

@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Megaphone, HeartHandshake, Radio, CalendarDays, X } from "lucide-react";
+import {
+  Bell,
+  Megaphone,
+  HeartHandshake,
+  Radio,
+  CalendarDays,
+  Sparkles,
+  X,
+  ArrowRight,
+} from "lucide-react";
 import type { AppAnnouncement } from "@/lib/announcements";
 
 type Props = {
@@ -32,6 +41,13 @@ function getAnnouncementStyle(type: AppAnnouncement["type"]) {
         iconWrap: "bg-amber-100 text-amber-700",
         pill: "bg-amber-100 text-amber-700",
         label: "Próximo",
+      };
+    case "especial":
+      return {
+        icon: Sparkles,
+        iconWrap: "bg-violet-100 text-violet-700",
+        pill: "bg-violet-100 text-violet-700",
+        label: "Especial",
       };
     default:
       return {
@@ -102,44 +118,73 @@ export default function NotificationsDrawer({
                   const Icon = style.icon;
 
                   return (
-                    <Link
+                    <div
                       key={item.id}
-                      href={item.href}
-                      onClick={onClose}
-                      className="block rounded-[26px] border border-stone-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
+                      className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
                     >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}
-                        >
-                          <Icon size={18} />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${style.pill}`}
-                            >
-                              {style.label}
-                            </span>
-
-                            {item.isPriority ? (
-                              <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                                Próximo
-                              </span>
-                            ) : null}
+                      <Link
+                        href={item.href}
+                        onClick={onClose}
+                        className="block p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${style.iconWrap}`}
+                          >
+                            <Icon size={18} />
                           </div>
 
-                          <h3 className="text-base font-semibold leading-6 text-stone-900">
-                            {item.title}
-                          </h3>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${style.pill}`}
+                              >
+                                {style.label}
+                              </span>
 
-                          <p className="mt-1 text-sm leading-6 text-stone-600">
-                            {item.description}
-                          </p>
+                              {item.isPriority ? (
+                                <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                                  Próximo
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <h3 className="text-base font-semibold leading-6 text-stone-900">
+                              {item.title}
+                            </h3>
+
+                            <p className="mt-1 text-sm leading-6 text-stone-600">
+                              {item.description}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </Link>
+                      </Link>
+
+                      {(item.ctaUrl && item.ctaLabel) ? (
+                        <div className="border-t border-stone-100 px-4 pb-4 pt-3">
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              href={item.href}
+                              onClick={onClose}
+                              className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-medium text-stone-900 ring-1 ring-stone-200 transition hover:bg-stone-50"
+                            >
+                              Ver más
+                            </Link>
+
+                            <Link
+                              href={item.ctaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={onClose}
+                              className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
+                            >
+                              {item.ctaLabel}
+                              <ArrowRight size={15} />
+                            </Link>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>

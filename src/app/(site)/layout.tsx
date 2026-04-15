@@ -6,6 +6,8 @@ import PageTransition from "@/components/layout/page-transition";
 import { getChurchInfo } from "@/lib/church-info";
 import { getAppAnnouncements } from "@/lib/announcements";
 import SiteOnboardingGate from "@/components/onboarding/site-onboarding-gate";
+import PushBootstrap from "@/components/pwa/push-bootstrap";
+import AppUpdatePrompt from "@/components/pwa/app-update-prompt";
 
 export default async function SiteLayout({
   children,
@@ -18,7 +20,9 @@ export default async function SiteLayout({
   return (
     <AppShell>
       <PageContainer>
+        <PushBootstrap />
         <SiteOnboardingGate />
+        <AppUpdatePrompt />
         <Header
           churchName={churchInfo?.church_name ?? "Comunidad VID"}
           announcements={announcements}
