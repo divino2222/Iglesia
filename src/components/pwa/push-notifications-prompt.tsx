@@ -8,13 +8,16 @@ const STORAGE_KEY = "comunidad-vid-push-prompt-dismissed";
 export default function PushNotificationsPrompt() {
   const [open, setOpen] = useState(false);
   const [supported, setSupported] = useState(false);
-  const [permissionState, setPermissionState] = useState<NotificationPermission | "unsupported">("default");
+  const [permissionState, setPermissionState] =
+    useState<NotificationPermission | "unsupported">("default");
+  const [installGatePassed, setInstallGatePassed] = useState(false);
 
   useEffect(() => {
     const isSupported =
       typeof window !== "undefined" &&
       "Notification" in window &&
-      "serviceWorker" in navigator;
+      "serviceWorker" in navigator &&
+      "PushManager" in window;
 
     setSupported(isSupported);
 
@@ -25,12 +28,43 @@ export default function PushNotificationsPrompt() {
 
     setPermissionState(Notification.permission);
 
-    const dismissed = window.localStorage.getItem(STORAGE_KEY);
-    if (!dismissed && Notification.permission === "default") {
-      const timer = window.setTimeout(() => setOpen(true), 2200);
-      return () => window.clearTimeout(timer);
+    const installDismissed =
+      window.localStorage.getItem("comunidad-vid-install-prompt-dismissed") === "true";
+
+    const installed =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      // @ts-expect-error safari standalone
+      window.navigator.standalone === true;
+
+    if (installDismissed || installed) {
+      setInstallGatePassed(true);
     }
+
+    const handleInstallClosed = () => {
+      setInstallGatePassed(true);
+    };
+
+    window.addEventListener("cv-install-prompt-closed", handleInstallClosed);
+
+    return () => {
+      window.removeEventListener("cv-install-prompt-closed", handleInstallClosed);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!supported) return;
+    if (!installGatePassed) return;
+    if (permissionState !== "default") return;
+
+    const dismissed = window.localStorage.getItem(STORAGE_KEY);
+    if (dismissed === "true") return;
+
+    const timer = window.setTimeout(() => {
+      setOpen(true);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [supported, installGatePassed, permissionState]);
 
   const close = () => {
     window.localStorage.setItem(STORAGE_KEY, "true");
@@ -38,10 +72,13 @@ export default function PushNotificationsPrompt() {
   };
 
   const requestPermission = async () => {
-    if (!supported) return;
-    const permission = await Notification.requestPermission();
-    setPermissionState(permission);
-    setOpen(false);
+    try {
+      const permission = await Notification.requestPermission();
+      setPermissionState(permission);
+      setOpen(false);
+    } catch {
+      setOpen(false);
+    }
   };
 
   if (!supported || !open || permissionState !== "default") return null;
@@ -91,7 +128,7 @@ export default function PushNotificationsPrompt() {
               </div>
               <ul className="space-y-2 text-sm leading-6 text-stone-700">
                 <li>• Avisos antes de transmisiones en vivo</li>
-                <li>• Recordatorios de oración y eventos</li>
+                <li>• Recordatorios de oración, liderazgo y eventos</li>
                 <li>• Novedades importantes de la iglesia</li>
               </ul>
             </div>

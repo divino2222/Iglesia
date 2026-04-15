@@ -10,6 +10,7 @@ import SectionHeading from "@/components/ui/section-heading";
 import HomeOnboarding from "@/components/onboarding/home-onboarding";
 import InstallAppPrompt from "@/components/pwa/install-app-prompt";
 import PushNotificationsPrompt from "@/components/pwa/push-notifications-prompt";
+import FloatingInstallButton from "@/components/pwa/floating-install-button";
 
 export default function HomePage() {
   return (
@@ -17,6 +18,7 @@ export default function HomePage() {
       <HomeOnboarding />
       <InstallAppPrompt />
       <PushNotificationsPrompt />
+      <FloatingInstallButton />
 
       <div className="space-y-8 px-4 py-6">
         <HomeHero />

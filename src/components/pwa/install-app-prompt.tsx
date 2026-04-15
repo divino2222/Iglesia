@@ -55,7 +55,7 @@ export default function InstallAppPrompt() {
 
     const timer = window.setTimeout(() => {
       if (ios) setOpen(true);
-    }, 1500);
+    }, 900);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
@@ -65,18 +65,23 @@ export default function InstallAppPrompt() {
 
   const close = () => {
     window.localStorage.setItem(STORAGE_KEY, "true");
+    window.dispatchEvent(new CustomEvent("cv-install-prompt-closed"));
     setOpen(false);
   };
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
+
     await deferredPrompt.prompt();
     const choice = await deferredPrompt.userChoice;
+
     if (choice.outcome === "accepted") {
       setOpen(false);
+      window.dispatchEvent(new CustomEvent("cv-install-prompt-closed"));
     } else {
       window.localStorage.setItem(STORAGE_KEY, "true");
       setOpen(false);
+      window.dispatchEvent(new CustomEvent("cv-install-prompt-closed"));
     }
   };
 
@@ -178,13 +183,12 @@ export default function InstallAppPrompt() {
               <div className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-4">
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
                   <Download size={12} />
-                  Instálala después
+                  Instálala desde el navegador
                 </div>
 
                 <p className="text-sm leading-6 text-stone-700">
-                  Si no aparece la opción automática, busca en el menú de tu navegador
-                  la acción <strong>Instalar aplicación</strong> o{" "}
-                  <strong>Agregar a pantalla principal</strong>.
+                  Si no aparece la opción automática, abre el menú de Chrome y busca
+                  <strong> Instalar aplicación</strong> o <strong>Agregar a pantalla principal</strong>.
                 </p>
               </div>
             )}
