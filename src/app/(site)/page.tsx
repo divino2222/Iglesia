@@ -9,12 +9,14 @@ import ChurchGalleryPreview from "@/components/home/church-gallery-preview";
 import SectionHeading from "@/components/ui/section-heading";
 import HomeOnboarding from "@/components/onboarding/home-onboarding";
 import InstallAppPrompt from "@/components/pwa/install-app-prompt";
+import PushNotificationsPrompt from "@/components/pwa/push-notifications-prompt";
 
 export default function HomePage() {
   return (
     <>
       <HomeOnboarding />
       <InstallAppPrompt />
+      <PushNotificationsPrompt />
 
       <div className="space-y-8 px-4 py-6">
         <HomeHero />

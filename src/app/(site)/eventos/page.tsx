@@ -45,14 +45,26 @@ function getMexicoCityNow() {
   );
 }
 
-function getNextOccurrence(targetWeekday: number, baseDate: Date) {
+function getNextOccurrence(
+  targetWeekday: number,
+  baseDate: Date,
+  eventHour = 0,
+  eventMinute = 0
+) {
   const result = new Date(baseDate);
   const currentWeekday = result.getDay();
 
   let diff = targetWeekday - currentWeekday;
-  if (diff <= 0) diff += 7;
+  if (diff < 0) diff += 7;
 
   result.setDate(result.getDate() + diff);
+  result.setHours(eventHour, eventMinute, 0, 0);
+
+  // Si es hoy pero ya pasó la hora de inicio, entonces sí lo manda a la próxima semana
+  if (result.getTime() < baseDate.getTime()) {
+    result.setDate(result.getDate() + 7);
+  }
+
   return result;
 }
 
@@ -148,7 +160,7 @@ export default async function EventsPage() {
         "Nuestra reunión principal de adoración, enseñanza bíblica y comunidad.",
       location: serviceAddress,
       weekday: 0,
-      time: churchInfo?.sunday_service_time ?? "10:00 AM · Presencial",
+      time: "Domingos · 10:00 AM a 1:00 PM · Presencial",
       type: "servicio",
       image: getRegularEventImage("servicio"),
     },
@@ -157,7 +169,7 @@ export default async function EventsPage() {
       description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
       location: "En línea",
       weekday: 2,
-      time: "9:00 PM",
+      time: "Martes · 9:00 PM a 10:00 PM · En línea",
       type: "oracion",
       image: getRegularEventImage("oracion"),
     },
@@ -167,7 +179,7 @@ export default async function EventsPage() {
         "Espacio de formación, dirección y crecimiento para líderes.",
       location: "En línea",
       weekday: 3,
-      time: churchInfo?.leadership_schedule ?? "8:00 PM",
+      time: "Miércoles · 8:00 PM a 9:00 PM · En línea",
       type: "liderazgo",
       image: getRegularEventImage("liderazgo"),
     },
@@ -176,18 +188,38 @@ export default async function EventsPage() {
       description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
       location: "En línea",
       weekday: 4,
-      time: "9:00 PM",
+      time: "Jueves · 9:00 PM a 10:00 PM · En línea",
       type: "oracion",
       image: getRegularEventImage("oracion"),
     },
   ];
 
   const upcomingRegularEvents = recurringEvents
-    .map((event) => ({
+  .map((event) => {
+    let hour = 0;
+    let minute = 0;
+
+    if (event.type === "servicio") {
+      hour = 10;
+      minute = 0;
+    }
+
+    if (event.type === "oracion") {
+      hour = 21;
+      minute = 0;
+    }
+
+    if (event.type === "liderazgo") {
+      hour = 20;
+      minute = 0;
+    }
+
+    return {
       ...event,
-      date: getNextOccurrence(event.weekday, now),
-    }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+      date: getNextOccurrence(event.weekday, now, hour, minute),
+    };
+  })
+  .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const { data } = await supabase
     .from("events")
@@ -211,8 +243,7 @@ export default async function EventsPage() {
           Eventos
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Mantente al día con reuniones regulares, encuentros especiales y
-          espacios de comunidad en Comunidad VID.
+          Mantente al día con reuniones regulares, encuentros especiales y espacios de comunidad en Comunidad VID.
         </p>
       </div>
 

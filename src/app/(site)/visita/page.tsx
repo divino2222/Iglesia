@@ -6,6 +6,8 @@ import {
   MessageCircle,
   ChevronRight,
   Church,
+  Radio,
+  Sparkles,
 } from "lucide-react";
 import { getChurchInfo } from "@/lib/church-info";
 import { churchMedia } from "@/lib/church-media";
@@ -17,8 +19,9 @@ export default async function VisitPage() {
   const address =
     churchInfo?.address ??
     "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";
-  const sundayService =
-    churchInfo?.sunday_service_time ?? "Domingos · 10:00 AM · Presencial";
+  const sundayService = "Domingos · 10:00 AM a 1:00 PM · Presencial";
+  const prayerSchedule = "Martes y jueves · 9:00 PM a 10:00 PM · En línea";
+  const leadershipSchedule = "Miércoles · 8:00 PM a 9:00 PM · En línea";
   const pastorName = churchInfo?.pastor_name ?? "Jose Luis Aguilar";
   const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
 
@@ -67,8 +70,7 @@ export default async function VisitPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-white/85">
-                Ven a compartir con nosotros un tiempo de adoración, palabra y
-                comunidad.
+                Ven a compartir con nosotros un tiempo de adoración, palabra y comunidad.
               </p>
             </div>
           </div>
@@ -78,7 +80,7 @@ export default async function VisitPage() {
               <div className="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-4">
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
                   <CalendarDays size={12} />
-                  Horario
+                  Servicio
                 </div>
                 <p className="text-sm leading-6 text-stone-700">
                   {sundayService}
@@ -91,6 +93,28 @@ export default async function VisitPage() {
                   Pastor
                 </div>
                 <p className="text-sm leading-6 text-stone-700">{pastorName}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-4">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                  <Radio size={12} />
+                  Oración
+                </div>
+                <p className="text-sm leading-6 text-stone-700">
+                  {prayerSchedule}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-4">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                  <Sparkles size={12} />
+                  Liderazgo
+                </div>
+                <p className="text-sm leading-6 text-stone-700">
+                  {leadershipSchedule}
+                </p>
               </div>
             </div>
 
@@ -145,10 +169,10 @@ export default async function VisitPage() {
             <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4">
               <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                 <Church size={12} />
-                Mensaje
+                Reunión principal
               </div>
               <p className="text-sm leading-6 text-stone-700">
-                Enseñanza bíblica, oración y comunidad.
+                Nuestro servicio principal es los domingos de 10:00 AM a 1:00 PM.
               </p>
             </div>
 
@@ -158,8 +182,7 @@ export default async function VisitPage() {
                 ¿Necesitas ayuda?
               </div>
               <p className="text-sm leading-6 text-stone-700">
-                Puedes escribirnos por WhatsApp y con gusto te acompañamos antes
-                de tu visita.
+                Puedes escribirnos por WhatsApp y con gusto te acompañamos antes de tu visita.
               </p>
             </div>
           </div>

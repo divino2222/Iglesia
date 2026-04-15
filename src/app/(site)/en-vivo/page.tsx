@@ -5,13 +5,13 @@ import {
   MonitorPlay,
   Wifi,
   ArrowRight,
+  CalendarDays,
+  Clock3,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getChurchInfo } from "@/lib/church-info";
 import { getUpcomingLiveItem } from "@/lib/upcoming-live";
-import LiveStatusChip from "@/components/live/live-status-chip";
-import LiveCountdownCard from "@/components/live/live-countdown-card";
-import { churchMedia } from "@/lib/church-media";
+import LiveCountdownCard from "@/components/home/live-countdown-card";
 
 type LiveStream = {
   id: number;
@@ -76,7 +76,7 @@ export default async function LivePage() {
           En vivo
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Conéctate con {churchName} y acompáñanos en nuestra transmisión.
+          Conéctate con {churchName} y acompáñanos en nuestras reuniones en línea.
         </p>
       </div>
 
@@ -84,165 +84,14 @@ export default async function LivePage() {
         <div className="rounded-[24px] border border-red-200 bg-red-50 p-5 text-sm text-red-700 shadow-sm">
           No se pudo cargar la transmisión en este momento.
         </div>
-      ) : !stream && !eventStream ? (
-        <div className="space-y-4">
-          {upcomingLive ? (
-            <LiveCountdownCard
-              startsAtIso={upcomingLive.startsAtIso}
-              title={upcomingLive.title}
-              dateLabel={upcomingLive.dateLabel}
-              modeLabel={upcomingLive.modeLabel}
-            />
-          ) : null}
-
-          <div className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)]">
-            <div
-              className="relative h-56"
-              style={{
-                backgroundImage: `url(${churchMedia.heroImage})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              <div className="absolute inset-0 bg-black/35" />
-
-              <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-stone-800 shadow-sm backdrop-blur">
-                <MonitorPlay size={14} />
-                No hay transmisión activa
-              </div>
-            </div>
-
-            <div className="p-5">
-              <h2 className="text-xl font-semibold text-stone-900">
-                Próxima transmisión
-              </h2>
-
-              {upcomingLive ? (
-                <>
-                  <div className="mt-4">
-                    <LiveStatusChip
-                      startsAtIso={upcomingLive.startsAtIso}
-                      isJoinableNow={upcomingLive.isJoinableNow}
-                      isActiveNow={upcomingLive.isActiveNow}
-                    />
-                  </div>
-
-                  <h3 className="mt-4 text-lg font-semibold text-stone-900">
-                    {upcomingLive.title}
-                  </h3>
-
-                  <p className="mt-3 text-sm leading-6 text-stone-600">
-                    {upcomingLive.description}
-                  </p>
-
-                  <p className="mt-3 text-sm font-medium text-stone-700">
-                    {upcomingLive.dateLabel} · {upcomingLive.modeLabel}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-stone-600">
-                  Por ahora no tenemos una transmisión próxima registrada.
-                </p>
-              )}
-
-              <div className="mt-5">
-                <Link
-                  href="/predicaciones"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
-                >
-                  Ver predicaciones
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            <div className="flex items-start gap-3 rounded-[24px] border border-stone-200 bg-white p-4 shadow-sm">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-stone-100">
-                <Wifi size={18} className="text-stone-700" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-stone-900">
-                  Mantente atento
-                </p>
-                <p className="mt-1 text-sm text-stone-600">
-                  Cuando la transmisión esté activa, aparecerá aquí automáticamente.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : eventStream && !stream ? (
+      ) : stream ? (
         <div className="space-y-4">
           <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
             <div className="aspect-video w-full bg-black">
               <iframe
                 className="h-full w-full"
-                src={eventStream.stream_url ?? ""}
-                title={eventStream.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            </div>
-
-            <div className="p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">
-                  <PlayCircle size={12} />
-                  Evento especial
-                </span>
-
-                <span className="inline-flex rounded-full bg-stone-100 px-3 py-1 text-[11px] font-semibold text-stone-700">
-                  {eventStream.is_online ? "En línea" : "Presencial + transmisión"}
-                </span>
-              </div>
-
-              <h2 className="text-xl font-semibold text-stone-900">
-                {eventStream.title}
-              </h2>
-
-              <p className="mt-3 text-sm leading-6 text-stone-600">
-                {eventStream.description || "Evento especial en transmisión."}
-              </p>
-
-              <div className="mt-4 space-y-1 text-sm text-stone-600">
-                <p>{formatSpecialDate(eventStream.event_date)}</p>
-                {eventStream.event_time ? <p>{eventStream.event_time}</p> : null}
-                {eventStream.location ? <p>{eventStream.location}</p> : null}
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link
-                  href={
-                    eventStream.stream_url?.replace("/embed/", "/watch?v=") || "#"
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
-                >
-                  <PlayCircle size={18} />
-                  Abrir en YouTube
-                </Link>
-
-                <Link
-                  href="/eventos"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
-                >
-                  Ver eventos
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
-            <div className="aspect-video w-full bg-black">
-              <iframe
-                className="h-full w-full"
-                src={stream!.youtube_embed_url}
-                title={stream!.title}
+                src={stream.youtube_embed_url}
+                title={stream.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
@@ -261,23 +110,17 @@ export default async function LivePage() {
               </div>
 
               <h2 className="text-xl font-semibold text-stone-900">
-                {stream!.title}
+                {stream.title}
               </h2>
 
-              {stream!.description ? (
-                <p className="mt-3 text-sm leading-6 text-stone-600">
-                  {stream!.description}
-                </p>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-stone-600">
-                  Acompáñanos en nuestra transmisión en vivo y sé parte de este
-                  tiempo de adoración, palabra y comunidad.
-                </p>
-              )}
+              <p className="mt-3 text-sm leading-6 text-stone-600">
+                {stream.description ||
+                  "Acompáñanos en nuestra transmisión en vivo y sé parte de este tiempo de adoración, palabra y comunidad."}
+              </p>
 
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link
-                  href={stream!.youtube_embed_url.replace("/embed/", "/watch?v=")}
+                  href={stream.youtube_embed_url.replace("/embed/", "/watch?v=")}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
@@ -306,23 +149,154 @@ export default async function LivePage() {
                   Transmisión activa
                 </p>
                 <p className="mt-1 text-sm text-stone-600">
-                  Puedes ver la reunión desde aquí o abrirla directamente en
-                  YouTube.
+                  Puedes ver la reunión desde aquí o abrirla directamente en YouTube.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : eventStream && upcomingLive?.isActiveNow ? (
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                className="h-full w-full"
+                src={eventStream.stream_url ?? ""}
+                title={eventStream.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+
+            <div className="p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-[11px] font-semibold text-red-700">
+                  <Radio size={12} />
+                  En vivo ahora
+                </span>
+
+                <span className="inline-flex rounded-full bg-stone-100 px-3 py-1 text-[11px] font-semibold text-stone-700">
+                  Evento especial
+                </span>
+              </div>
+
+              <h2 className="text-xl font-semibold text-stone-900">
+                {eventStream.title}
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-stone-600">
+                {eventStream.description || "Evento especial en transmisión."}
+              </p>
+
+              <div className="mt-4 space-y-1 text-sm text-stone-600">
+                <p className="flex items-center gap-2">
+                  <CalendarDays size={15} className="text-stone-400" />
+                  {formatSpecialDate(eventStream.event_date)}
+                </p>
+
+                {eventStream.event_time ? (
+                  <p className="flex items-center gap-2">
+                    <Clock3 size={15} className="text-stone-400" />
+                    {eventStream.event_time}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href={eventStream.stream_url?.replace("/embed/", "/watch?v=") || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
+                >
+                  <PlayCircle size={18} />
+                  Abrir en YouTube
+                </Link>
+
+                <Link
+                  href="/eventos"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
+                >
+                  Ver eventos
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : upcomingLive ? (
+        <div className="space-y-4">
+          <LiveCountdownCard item={upcomingLive} />
+
+          <div className="grid gap-3">
+            <div className="flex items-start gap-3 rounded-[24px] border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-stone-100">
+                <Wifi size={18} className="text-stone-700" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-stone-900">
+                  Próxima reunión en línea
+                </p>
+                <p className="mt-1 text-sm text-stone-600">
+                  Martes y jueves de 9:00 PM a 10:00 PM hay oración en línea.
+                  También encontrarás aquí cualquier transmisión especial o el
+                  servicio dominical cuando esté disponible.
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3 rounded-[24px] border border-stone-200 bg-white p-4 shadow-sm">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100">
-                <Wifi size={18} className="text-emerald-700" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100">
+                <Clock3 size={18} className="text-amber-700" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-stone-900">
-                  Participa desde donde estés
+                  Horarios habituales
                 </p>
                 <p className="mt-1 text-sm text-stone-600">
-                  Conéctate, comparte la transmisión y acompáñanos en comunidad.
+                  Servicio: domingos de 10:00 AM a 1:00 PM. Liderazgo: miércoles
+                  de 8:00 PM a 9:00 PM. Oración: martes y jueves de 9:00 PM a
+                  10:00 PM.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
+            <div
+              className="relative h-52"
+              style={{
+                backgroundImage: `url("/images/live-placeholder.svg")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            >
+              <div className="absolute inset-0 bg-black/20" />
+
+              <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-stone-800 shadow-sm backdrop-blur">
+                <MonitorPlay size={14} />
+                No hay transmisión activa
+              </div>
+            </div>
+
+            <div className="p-5">
+              <h2 className="text-xl font-semibold text-stone-900">
+                Próxima transmisión
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-stone-600">
+                Aquí encontrarás nuestras transmisiones en vivo, reuniones en línea y eventos especiales cuando estén disponibles.
+              </p>
+
+              <div className="mt-5">
+                <Link
+                  href="/eventos"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
+                >
+                  Ver eventos
+                  <ArrowRight size={16} />
+                </Link>
               </div>
             </div>
           </div>

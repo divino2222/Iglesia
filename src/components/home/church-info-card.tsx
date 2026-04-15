@@ -13,11 +13,8 @@ export default async function ChurchInfoCard() {
 
   const churchName = churchInfo?.church_name ?? "Comunidad VID";
   const pastorName = churchInfo?.pastor_name ?? "Jose Luis Aguilar";
-  const sundayService =
-    churchInfo?.sunday_service_time ?? "Domingos · 10:00 AM · Presencial";
-  const prayerSchedule =
-    churchInfo?.prayer_schedule ??
-    "Martes y jueves · 9:00 PM a 10:00 PM · En línea";
+  const sundayService = "Domingos · 10:00 AM a 1:00 PM · Presencial";
+  const prayerSchedule = "Martes y jueves · 9:00 PM a 10:00 PM · En línea";
   const address =
     churchInfo?.address ??
     "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";
@@ -63,6 +60,16 @@ export default async function ChurchInfoCard() {
           </div>
           <p className="text-sm leading-6 text-stone-800">{prayerSchedule}</p>
         </div>
+      </div>
+
+      <div className="mt-4 rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white px-4 py-4">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+          <Radio size={12} />
+          Liderazgo
+        </div>
+        <p className="text-sm leading-6 text-stone-800">
+          Miércoles · 8:00 PM a 9:00 PM · En línea
+        </p>
       </div>
 
       <div className="mt-4 rounded-3xl border border-stone-100 bg-gradient-to-br from-stone-50 to-white px-4 py-4">

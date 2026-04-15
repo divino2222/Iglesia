@@ -6,8 +6,7 @@ export default async function SundayInviteBanner() {
   const churchInfo = await getChurchInfo();
 
   const churchName = churchInfo?.church_name ?? "Comunidad VID";
-  const sundayService =
-    churchInfo?.sunday_service_time ?? "Domingos · 10:00 AM · Presencial";
+  const sundayService = "Domingos · 10:00 AM a 1:00 PM · Presencial";
   const address =
     churchInfo?.address ??
     "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";

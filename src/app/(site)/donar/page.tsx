@@ -27,8 +27,7 @@ export default async function DonarPage() {
           Donar
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Tu generosidad ayuda a fortalecer la obra, servir a personas y seguir
-          construyendo comunidad.
+          Tu generosidad ayuda a fortalecer la obra, servir a personas y seguir construyendo comunidad.
         </p>
       </div>
 
@@ -53,8 +52,7 @@ export default async function DonarPage() {
                 Apoya con generosidad
               </h2>
               <p className="mt-3 text-sm leading-6 text-white/85">
-                Si deseas apoyar a {churchName}, escríbenos y te compartiremos la
-                información correspondiente.
+                Si deseas apoyar a {churchName}, escríbenos y te compartiremos la información correspondiente.
               </p>
             </div>
           </div>
@@ -79,8 +77,7 @@ export default async function DonarPage() {
                   Generosidad con propósito
                 </div>
                 <p className="text-sm leading-7 text-stone-700">
-                  Cada aporte ayuda a sostener actividades, atención a personas y
-                  espacios de comunidad.
+                  Cada aporte ayuda a sostener actividades, atención a personas y espacios de comunidad.
                 </p>
               </div>
 
@@ -90,8 +87,7 @@ export default async function DonarPage() {
                   Proceso claro
                 </div>
                 <p className="text-sm leading-7 text-stone-700">
-                  La información se comparte de forma directa y clara por WhatsApp
-                  para acompañarte en el proceso.
+                  La información se comparte de forma directa y clara por WhatsApp para acompañarte en el proceso.
                 </p>
               </div>
             </div>

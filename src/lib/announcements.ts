@@ -9,6 +9,7 @@ export type AppAnnouncement = {
   source: "manual" | "regular_event" | "special_event";
   createdAt: string;
   isPriority?: boolean;
+  href: string;
 };
 
 type ManualAnnouncement = {
@@ -111,28 +112,23 @@ function normalizeAnnouncementType(
   return "general";
 }
 
+function getManualHref(type: AppAnnouncement["type"]) {
+  switch (type) {
+    case "en-vivo":
+      return "/en-vivo";
+    case "evento":
+      return "/eventos";
+    case "oracion":
+      return "/oracion";
+    default:
+      return "/";
+  }
+}
+
 export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
   const supabase = await createClient();
-  const churchInfo = await getChurchInfo();
+  await getChurchInfo();
   const now = getMexicoCityNow();
-
-  const sundayTime = parseTimeTo24Hour(
-    churchInfo?.sunday_service_time,
-    10,
-    0
-  );
-
-  const prayerTime = parseTimeTo24Hour(
-    churchInfo?.prayer_schedule,
-    21,
-    0
-  );
-
-  const leadershipTime = parseTimeTo24Hour(
-    churchInfo?.leadership_schedule,
-    20,
-    0
-  );
 
   const { data: manualData } = await supabase
     .from("announcements")
@@ -143,44 +139,62 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
 
   const manualAnnouncements: AppAnnouncement[] = (
     (manualData ?? []) as ManualAnnouncement[]
-  ).map((item) => ({
-    id: `manual-${item.id}`,
-    title: item.title,
-    description: item.description ?? "",
-    type: normalizeAnnouncementType(item.type),
-    source: "manual",
-    createdAt: item.created_at,
-    isPriority: false,
-  }));
+  ).map((item) => {
+    const type = normalizeAnnouncementType(item.type);
+
+    return {
+      id: `manual-${item.id}`,
+      title: item.title,
+      description: item.description ?? "",
+      type,
+      source: "manual",
+      createdAt: item.created_at,
+      isPriority: false,
+      href: getManualHref(type),
+    };
+  });
+
+  const sundayStart = getNextOccurrenceWithTime(0, 10, 0, now);
+  const tuesdayPrayerStart = getNextOccurrenceWithTime(2, 21, 0, now);
+  const wednesdayLeadershipStart = getNextOccurrenceWithTime(3, 20, 0, now);
+  const thursdayPrayerStart = getNextOccurrenceWithTime(4, 21, 0, now);
 
   const regularCandidates = [
     {
       id: "regular-sunday",
       title: "Servicio dominical próximo",
-      date: getNextOccurrenceWithTime(0, sundayTime.hour, sundayTime.minute, now),
-      descriptionBase: "Te esperamos en Comunidad VID.",
+      date: sundayStart,
+      descriptionBase:
+        "Te esperamos en Comunidad VID este domingo de 10:00 AM a 1:00 PM.",
       type: "evento" as AppAnnouncement["type"],
+      href: "/eventos",
     },
     {
       id: "regular-tuesday-prayer",
       title: "Oración en línea próxima",
-      date: getNextOccurrenceWithTime(2, prayerTime.hour, prayerTime.minute, now),
-      descriptionBase: "Nuestra próxima noche de oración será en línea.",
+      date: tuesdayPrayerStart,
+      descriptionBase:
+        "Nuestra noche de oración será el martes de 9:00 PM a 10:00 PM.",
       type: "oracion" as AppAnnouncement["type"],
+      href: "/eventos",
     },
     {
       id: "regular-wednesday-leadership",
       title: "Grupo de liderazgo próximo",
-      date: getNextOccurrenceWithTime(3, leadershipTime.hour, leadershipTime.minute, now),
-      descriptionBase: "Espacio de formación y dirección para líderes.",
+      date: wednesdayLeadershipStart,
+      descriptionBase:
+        "Espacio de formación y dirección para líderes, miércoles de 8:00 PM a 9:00 PM.",
       type: "general" as AppAnnouncement["type"],
+      href: "/eventos",
     },
     {
       id: "regular-thursday-prayer",
       title: "Oración en línea próxima",
-      date: getNextOccurrenceWithTime(4, prayerTime.hour, prayerTime.minute, now),
-      descriptionBase: "Nuestra próxima noche de oración será en línea.",
+      date: thursdayPrayerStart,
+      descriptionBase:
+        "Nuestra noche de oración será el jueves de 9:00 PM a 10:00 PM.",
       type: "oracion" as AppAnnouncement["type"],
+      href: "/eventos",
     },
   ];
 
@@ -194,6 +208,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
       source: "regular_event",
       createdAt: item.date.toISOString(),
       isPriority: isWithinNextHours(item.date, now, 12),
+      href: item.href,
     }));
 
   const { data: specialData } = await supabase
@@ -214,7 +229,11 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
 
       const type: AppAnnouncement["type"] = event.is_streamable
         ? "en-vivo"
+        : event.is_online
+        ? "oracion"
         : "evento";
+
+      const href = event.is_streamable ? "/en-vivo" : "/eventos";
 
       return {
         id: `special-${event.id}`,
@@ -226,6 +245,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
         source: "special_event" as const,
         createdAt: startsAt.toISOString(),
         isPriority: isWithinNextHours(startsAt, now, 12),
+        href,
         startsAt,
       };
     })

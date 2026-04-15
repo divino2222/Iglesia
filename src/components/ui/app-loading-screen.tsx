@@ -1,23 +1,72 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type Props = {
   title?: string;
   subtitle?: string;
 };
 
+function getRouteMessage(pathname: string) {
+  if (pathname.startsWith("/en-vivo")) {
+    return {
+      title: "Comunidad VID",
+      subtitle: "Preparando transmisión y acceso en vivo",
+    };
+  }
+
+  if (pathname.startsWith("/eventos")) {
+    return {
+      title: "Comunidad VID",
+      subtitle: "Cargando agenda y próximos eventos",
+    };
+  }
+
+  if (pathname.startsWith("/predicaciones")) {
+    return {
+      title: "Comunidad VID",
+      subtitle: "Cargando mensajes y predicaciones",
+    };
+  }
+
+  if (pathname.startsWith("/iglesia")) {
+    return {
+      title: "Comunidad VID",
+      subtitle: "Abriendo información de la iglesia",
+    };
+  }
+
+  if (pathname.startsWith("/visita")) {
+    return {
+      title: "Comunidad VID",
+      subtitle: "Preparando tu experiencia de visita",
+    };
+  }
+
+  return {
+    title: "Comunidad VID",
+    subtitle: "Preparando tu experiencia",
+  };
+}
+
 export default function AppLoadingScreen({
-  title = "Comunidad VID",
-  subtitle = "Preparando tu experiencia",
+  title,
+  subtitle,
 }: Props) {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setVisible(true));
     return () => window.cancelAnimationFrame(id);
   }, []);
+
+  const routeCopy = useMemo(() => getRouteMessage(pathname), [pathname]);
+
+  const finalTitle = title ?? routeCopy.title;
+  const finalSubtitle = subtitle ?? routeCopy.subtitle;
 
   return (
     <div className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#f8f6f2_0%,#f2ede5_100%)] px-6">
@@ -76,10 +125,12 @@ export default function AppLoadingScreen({
             </p>
 
             <h1 className="mt-2 text-[32px] font-semibold tracking-tight text-stone-950">
-              {title}
+              {finalTitle}
             </h1>
 
-            <p className="mt-2 text-sm leading-6 text-stone-500">{subtitle}</p>
+            <p className="mt-2 text-sm leading-6 text-stone-500">
+              {finalSubtitle}
+            </p>
           </div>
 
           <div

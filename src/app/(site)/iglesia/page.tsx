@@ -22,11 +22,10 @@ export default async function IglesiaPage() {
   const address =
     churchInfo?.address ??
     "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";
-  const sundayService =
-    churchInfo?.sunday_service_time ?? "Domingos · 10:00 AM · Presencial";
-  const prayerSchedule =
-    churchInfo?.prayer_schedule ??
-    "Martes y jueves · 9:00 PM a 10:00 PM · En línea";
+
+  const sundayService = "Domingos · 10:00 AM a 1:00 PM · Presencial";
+  const prayerSchedule = "Martes y jueves · 9:00 PM a 10:00 PM · En línea";
+  const leadershipSchedule = "Miércoles · 8:00 PM a 9:00 PM · En línea";
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     address
@@ -69,8 +68,7 @@ export default async function IglesiaPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-white/85">
-                Queremos recibirte con amor, acompañarte y ayudarte a conectar con
-                la vida de la iglesia.
+                Queremos recibirte con amor, acompañarte y ayudarte a conectar con la vida de la iglesia.
               </p>
             </div>
           </div>
@@ -91,22 +89,32 @@ export default async function IglesiaPage() {
                   Visión
                 </div>
                 <p className="text-sm leading-7 text-stone-700">
-                  Ser una comunidad que ama a Dios, sirve a las personas y acompaña
-                  a cada vida en su crecimiento espiritual.
+                  Ser una comunidad que ama a Dios, sirve a las personas y acompaña a cada vida en su crecimiento espiritual.
                 </p>
               </div>
 
               <div className="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-4">
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
                   <Radio size={12} />
-                  Horarios
+                  Servicio
                 </div>
-                <p className="text-sm leading-7 text-stone-700">
-                  Servicio: {sundayService}
-                </p>
-                <p className="text-sm leading-7 text-stone-700">
-                  Oración: {prayerSchedule}
-                </p>
+                <p className="text-sm leading-7 text-stone-700">{sundayService}</p>
+              </div>
+
+              <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                  <Radio size={12} />
+                  Oración
+                </div>
+                <p className="text-sm leading-7 text-stone-700">{prayerSchedule}</p>
+              </div>
+
+              <div className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-4">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                  <Sparkles size={12} />
+                  Liderazgo
+                </div>
+                <p className="text-sm leading-7 text-stone-700">{leadershipSchedule}</p>
               </div>
 
               <div className="rounded-3xl border border-stone-100 bg-gradient-to-br from-stone-50 to-white p-4">
@@ -133,8 +141,7 @@ export default async function IglesiaPage() {
                   Comunidad
                 </div>
                 <p className="text-sm leading-7 text-stone-700">
-                  Queremos caminar contigo, recibirte con amor y ayudarte a
-                  integrarte a la vida de la iglesia.
+                  Queremos caminar contigo, recibirte con amor y ayudarte a integrarte a la vida de la iglesia.
                 </p>
               </div>
             </div>
