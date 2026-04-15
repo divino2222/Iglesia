@@ -25,25 +25,27 @@ export default function Header({
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-stone-50/95 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-stone-200/70 bg-[#f8f6f2]/85 backdrop-blur-xl">
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-stone-200 bg-black shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-stone-200 bg-black shadow-[0_8px_20px_rgba(0,0,0,0.10)]">
               <Image
                 src="/images/logo-comunidad-vid.png"
                 alt="Logo Comunidad VID"
-                width={40}
-                height={40}
+                width={44}
+                height={44}
                 className="h-auto w-auto max-h-full max-w-full object-contain"
                 priority
               />
             </div>
 
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-stone-900">
+              <p className="truncate text-sm font-semibold tracking-tight text-stone-950">
                 {churchName}
               </p>
-              <p className="truncate text-xs text-stone-500">Bienvenido</p>
+              <p className="truncate text-xs text-stone-500">
+                Bienvenido
+              </p>
             </div>
           </div>
 
@@ -51,7 +53,7 @@ export default function Header({
             <button
               type="button"
               onClick={() => setNotificationsOpen(true)}
-              className="relative rounded-xl p-2 text-stone-600 transition hover:bg-stone-100"
+              className="relative rounded-2xl p-2.5 text-stone-600 transition hover:bg-white/80 active:scale-95"
               aria-label="Notificaciones"
             >
               <Bell size={18} />
@@ -71,7 +73,7 @@ export default function Header({
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className="rounded-xl p-2 text-stone-700 transition hover:bg-stone-100"
+              className="rounded-2xl p-2.5 text-stone-700 transition hover:bg-white/80 active:scale-95"
               aria-label="Abrir menú"
             >
               <Menu size={20} />

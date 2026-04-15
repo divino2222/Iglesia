@@ -1,74 +1,36 @@
 @import "tailwindcss";
 
+:root {
+  --background: #f6f3ef;
+  --foreground: #171717;
+}
+
 html {
-  scroll-behavior: smooth;
+  background: linear-gradient(180deg, #f8f6f2 0%, #f3efe8 100%);
 }
 
-html,
 body {
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.9), transparent 28%),
+    linear-gradient(180deg, #f8f6f2 0%, #f3efe8 100%);
+  font-family: Arial, Helvetica, sans-serif;
   min-height: 100vh;
-  background: #f5f5f4;
-  color: #18181b;
-  overscroll-behavior: none;
 }
 
-body {
-  font-feature-settings: "rlig" 1, "calt" 1;
+* {
+  box-sizing: border-box;
 }
 
-@keyframes loadingBar {
-  0% {
-    transform: scaleX(0.15);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scaleX(0.65);
-    opacity: 0.85;
-  }
-  100% {
-    transform: scaleX(1);
-    opacity: 1;
-  }
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
-@keyframes fadeUpSoft {
-  0% {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+video {
+  display: block;
 }
 
-@keyframes pulseSoft {
-  0% {
-    transform: scale(1);
-    opacity: 0.92;
-  }
-  50% {
-    transform: scale(1.03);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0.92;
-  }
-}
-
-.animate-fade-up-soft {
-  animation: fadeUpSoft 0.7s ease-out both;
-}
-
-.animate-fade-up-soft-delay-1 {
-  animation: fadeUpSoft 0.85s ease-out both;
-}
-
-.animate-fade-up-soft-delay-2 {
-  animation: fadeUpSoft 1s ease-out both;
-}
-
-.animate-pulse-soft {
-  animation: pulseSoft 2.2s ease-in-out infinite;
+img {
+  display: block;
 }

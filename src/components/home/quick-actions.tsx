@@ -7,71 +7,69 @@ import {
 } from "lucide-react";
 import { getChurchInfo } from "@/lib/church-info";
 
+const actions = [
+  {
+    label: "En vivo",
+    href: "/en-vivo",
+    icon: Radio,
+    accent: "bg-red-50 text-red-700 border-red-100",
+    iconAccent: "bg-red-100 text-red-700",
+  },
+  {
+    label: "Eventos",
+    href: "/eventos",
+    icon: CalendarDays,
+    accent: "bg-blue-50 text-blue-700 border-blue-100",
+    iconAccent: "bg-blue-100 text-blue-700",
+  },
+  {
+    label: "WhatsApp",
+    href: "#",
+    icon: MessageCircle,
+    accent: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    iconAccent: "bg-emerald-100 text-emerald-700",
+  },
+  {
+    label: "Oración",
+    href: "/oracion",
+    icon: HeartHandshake,
+    accent: "bg-amber-50 text-amber-700 border-amber-100",
+    iconAccent: "bg-amber-100 text-amber-700",
+  },
+];
+
 export default async function QuickActions() {
   const churchInfo = await getChurchInfo();
-  const churchName = churchInfo?.church_name ?? "Comunidad VID";
   const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
-
-  const whatsappGeneralMessage = encodeURIComponent(
-    `Hola, me gustaría recibir información de ${churchName}.`
-  );
-
-  const actions = [
-    {
-      title: "En vivo",
-      href: "/en-vivo",
-      icon: Radio,
-      color: "bg-gradient-to-br from-red-50 to-red-100 text-red-700",
-      ring: "ring-red-100",
-      external: false,
-    },
-    {
-      title: "Eventos",
-      href: "/eventos",
-      icon: CalendarDays,
-      color: "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700",
-      ring: "ring-blue-100",
-      external: false,
-    },
-    {
-      title: "WhatsApp",
-      href: `https://wa.me/${whatsappNumber}?text=${whatsappGeneralMessage}`,
-      icon: MessageCircle,
-      color: "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700",
-      ring: "ring-emerald-100",
-      external: true,
-    },
-    {
-      title: "Oración",
-      href: "/oracion",
-      icon: HeartHandshake,
-      color: "bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700",
-      ring: "ring-amber-100",
-      external: false,
-    },
-  ];
+  const churchName = churchInfo?.church_name ?? "Comunidad VID";
 
   return (
     <div className="grid grid-cols-4 gap-3">
       {actions.map((action) => {
         const Icon = action.icon;
+        const href =
+          action.label === "WhatsApp"
+            ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+                `Hola, me gustaría recibir información de ${churchName}.`
+              )}`
+            : action.href;
+
+        const external = action.label === "WhatsApp";
 
         return (
           <Link
-            key={action.title}
-            href={action.href}
-            target={action.external ? "_blank" : undefined}
-            rel={action.external ? "noreferrer" : undefined}
-            className={`group flex flex-col items-center justify-center rounded-[22px] border border-stone-200 bg-white px-3 py-4 shadow-sm ring-1 transition duration-300 hover:-translate-y-1 hover:shadow-lg ${action.ring}`}
+            key={action.label}
+            href={href}
+            target={external ? "_blank" : undefined}
+            rel={external ? "noreferrer" : undefined}
+            className={`group flex flex-col items-center justify-center rounded-[24px] border p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 ${action.accent}`}
           >
             <div
-              className={`mb-2 flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm transition duration-300 group-hover:scale-105 ${action.color}`}
+              className={`mb-2 flex h-11 w-11 items-center justify-center rounded-2xl ${action.iconAccent}`}
             >
               <Icon size={18} />
             </div>
-            <span className="text-center text-[11px] font-medium text-stone-700">
-              {action.title}
-            </span>
+            <span className="text-[12px] font-medium">{action.label}</span>
           </Link>
         );
       })}

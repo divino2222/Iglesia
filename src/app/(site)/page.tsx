@@ -7,62 +7,69 @@ import SermonsSection from "@/components/home/sermons-section";
 import ChurchInfoCard from "@/components/home/church-info-card";
 import ChurchGalleryPreview from "@/components/home/church-gallery-preview";
 import SectionHeading from "@/components/ui/section-heading";
+import HomeOnboarding from "@/components/onboarding/home-onboarding";
+import InstallAppPrompt from "@/components/pwa/install-app-prompt";
 
 export default function HomePage() {
   return (
-    <div className="space-y-7 px-4 py-6">
-      <HomeHero />
+    <>
+      <HomeOnboarding />
+      <InstallAppPrompt />
 
-      <section>
-        <SectionHeading
-          eyebrow="Conecta"
-          title="Transmisión y acceso rápido"
-          subtitle="Acompáñanos en vivo o entra rápido a las secciones principales."
-        />
-        <div className="space-y-4">
-          <LiveUpcomingCard />
-          <QuickActions />
-        </div>
-      </section>
+      <div className="space-y-8 px-4 py-6">
+        <HomeHero />
 
-      <section>
-        <SectionHeading
-          eyebrow="Te esperamos"
-          title="Reúnete con nosotros"
-          subtitle="Encuentra el próximo servicio presencial y cómo llegar."
-        />
-        <div className="space-y-4">
-          <SundayInviteBanner />
-          <ChurchInfoCard />
-        </div>
-      </section>
+        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+          <SectionHeading
+            eyebrow="Conecta"
+            title="Transmisión y acceso rápido"
+            subtitle="Acompáñanos en vivo o entra rápido a las secciones principales."
+          />
+          <div className="space-y-4">
+            <LiveUpcomingCard />
+            <QuickActions />
+          </div>
+        </section>
 
-      <section>
-        <SectionHeading
-          eyebrow="Galería"
-          title="Nuestra comunidad"
-          subtitle="Imágenes reales de la vida de la iglesia."
-        />
-        <ChurchGalleryPreview />
-      </section>
+        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+          <SectionHeading
+            eyebrow="Te esperamos"
+            title="Reúnete con nosotros"
+            subtitle="Encuentra el próximo servicio presencial y cómo llegar."
+          />
+          <div className="space-y-4">
+            <SundayInviteBanner />
+            <ChurchInfoCard />
+          </div>
+        </section>
 
-      <section>
-        <SectionHeading
-          eyebrow="Agenda"
-          title="Próximos eventos"
-          subtitle="Mantente al día con reuniones regulares y actividades."
-        />
-        <EventsSection />
-      </section>
+        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+          <SectionHeading
+            eyebrow="Galería"
+            title="Nuestra comunidad"
+            subtitle="Imágenes reales de la vida de la iglesia."
+          />
+          <ChurchGalleryPreview />
+        </section>
 
-      <section>
-        <SectionHeading
-          eyebrow="Escucha"
-          title="Últimas predicaciones"
-          subtitle="Mensajes recientes para fortalecer tu fe."
-        />
-        <SermonsSection />
-      </section>
-    </div>
+        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+          <SectionHeading
+            eyebrow="Agenda"
+            title="Próximos eventos"
+            subtitle="Mantente al día con reuniones regulares y actividades."
+          />
+          <EventsSection />
+        </section>
+
+        <section className="rounded-[34px] border border-white/60 bg-white/55 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+          <SectionHeading
+            eyebrow="Escucha"
+            title="Últimas predicaciones"
+            subtitle="Mensajes recientes para fortalecer tu fe."
+          />
+          <SermonsSection />
+        </section>
+      </div>
+    </>
   );
 }

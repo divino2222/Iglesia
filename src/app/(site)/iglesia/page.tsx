@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getChurchInfo } from "@/lib/church-info";
 import { churchMedia } from "@/lib/church-media";
+import InstallGuideCard from "@/components/pwa/install-guide-card";
 import {
   Church,
   HeartHandshake,
@@ -190,6 +191,8 @@ export default async function IglesiaPage() {
             ))}
           </div>
         </div>
+
+        <InstallGuideCard />
       </div>
     </div>
   );
