@@ -1,0 +1,20 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="700" fill="#111827"></rect>
+  <rect width="1200" height="700" fill="url(#paint0_linear)"></rect>
+  <circle cx="1030" cy="108" r="180" fill="#ffffff" fill-opacity="0.06"></circle>
+  <circle cx="176" cy="560" r="220" fill="#ffffff" fill-opacity="0.04"></circle>
+  <rect x="90" y="100" width="1020" height="500" rx="42" fill="#ffffff" fill-opacity="0.05" stroke="#ffffff" stroke-opacity="0.12"></rect>
+  <rect x="140" y="150" width="210" height="34" rx="17" fill="#FCA5A5"></rect>
+  <rect x="140" y="216" width="420" height="58" rx="18" fill="#ffffff" fill-opacity="0.15"></rect>
+  <rect x="140" y="294" width="360" height="18" rx="9" fill="#ffffff" fill-opacity="0.14"></rect>
+  <rect x="140" y="326" width="300" height="18" rx="9" fill="#ffffff" fill-opacity="0.14"></rect>
+  <circle cx="835" cy="310" r="105" fill="#ffffff" fill-opacity="0.12"></circle>
+  <path d="M800 257.5C800 243.969 815.165 235.972 826.257 243.767L894.087 291.267C903.471 297.84 903.471 311.66 894.087 318.233L826.257 365.733C815.165 373.528 800 365.531 800 352V257.5Z" fill="white"></path>
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="1200" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"></stop>
+      <stop offset="0.55" stop-color="#1F2937"></stop>
+      <stop offset="1" stop-color="#111827"></stop>
+    </linearGradient>
+  </defs>
+</svg>
