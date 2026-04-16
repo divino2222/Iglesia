@@ -6,6 +6,7 @@ import EventsSection from "@/components/home/events-section";
 import SermonsSection from "@/components/home/sermons-section";
 import ChurchInfoCard from "@/components/home/church-info-card";
 import ChurchGalleryPreview from "@/components/home/church-gallery-preview";
+import PrayerLeaderCard from "@/components/home/prayer-leader-card";
 import SectionHeading from "@/components/ui/section-heading";
 import HomeOnboarding from "@/components/onboarding/home-onboarding";
 import InstallAppPrompt from "@/components/pwa/install-app-prompt";
@@ -32,6 +33,7 @@ export default function HomePage() {
           <div className="space-y-4">
             <LiveUpcomingCard />
             <QuickActions />
+            <PrayerLeaderCard />
           </div>
         </section>
 

@@ -35,18 +35,13 @@ type SpecialEvent = {
   created_at: string;
   cta_label: string | null;
   cta_url: string | null;
+  leader_name: string | null;
 };
 
 function getMexicoCityNow() {
   return new Date(
     new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" })
   );
-}
-
-function buildDateTime(baseDate: Date, hour: number, minute: number) {
-  const date = new Date(baseDate);
-  date.setHours(hour, minute, 0, 0);
-  return date;
 }
 
 function parseTimeTo24Hour(
@@ -57,18 +52,40 @@ function parseTimeTo24Hour(
   if (!time) return { hour: fallbackHour, minute: fallbackMinute };
 
   const normalized = time.toLowerCase().trim();
-  const match = normalized.match(/(\d{1,2}):(\d{2})\s*(am|pm)/);
 
-  if (!match) return { hour: fallbackHour, minute: fallbackMinute };
+  const match12 = normalized.match(/(\d{1,2}):(\d{2})\s*(am|pm)/);
+  if (match12) {
+    let hour = Number(match12[1]);
+    const minute = Number(match12[2]);
+    const meridiem = match12[3];
 
-  let hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const meridiem = match[3];
+    if (meridiem === "pm" && hour !== 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
 
-  if (meridiem === "pm" && hour !== 12) hour += 12;
-  if (meridiem === "am" && hour === 12) hour = 0;
+    return { hour, minute };
+  }
 
-  return { hour, minute };
+  const match24 = normalized.match(/(\d{1,2}):(\d{2})/);
+  if (match24) {
+    return {
+      hour: Number(match24[1]),
+      minute: Number(match24[2]),
+    };
+  }
+
+  return { hour: fallbackHour, minute: fallbackMinute };
+}
+
+function parseLocalDate(dateStr: string) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+function buildDateTime(dateStr: string, timeStr: string | null) {
+  const base = parseLocalDate(dateStr);
+  const parsed = parseTimeTo24Hour(timeStr, 19, 0);
+  base.setHours(parsed.hour, parsed.minute, 0, 0);
+  return base;
 }
 
 function getNextOccurrenceWithTime(
@@ -173,80 +190,77 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
   });
 
   const sundayStart = getNextOccurrenceWithTime(0, 10, 0, now);
-  const tuesdayPrayerStart = getNextOccurrenceWithTime(2, 21, 0, now);
   const wednesdayLeadershipStart = getNextOccurrenceWithTime(3, 20, 0, now);
-  const thursdayPrayerStart = getNextOccurrenceWithTime(4, 21, 0, now);
 
-  const regularCandidates = [
+  const regularAnnouncements: AppAnnouncement[] = [
     {
       id: "regular-sunday",
       title: "Servicio dominical próximo",
-      date: sundayStart,
-      descriptionBase:
-        "Te esperamos en Comunidad VID este domingo de 10:00 AM a 1:00 PM.",
+      description: `Te esperamos en Comunidad VID este domingo de 10:00 AM a 1:00 PM. ${formatAnnouncementDate(
+        sundayStart
+      )}.`,
       type: "evento" as const,
+      source: "regular_event" as const,
+      createdAt: sundayStart.toISOString(),
+      isPriority: isWithinNextHours(sundayStart, now, 12),
       href: "/eventos",
-    },
-    {
-      id: "regular-tuesday-prayer",
-      title: "Oración en línea próxima",
-      date: tuesdayPrayerStart,
-      descriptionBase:
-        "Nuestra noche de oración será el martes de 9:00 PM a 10:00 PM.",
-      type: "oracion" as const,
-      href: "/eventos",
+      ctaLabel: null,
+      ctaUrl: null,
     },
     {
       id: "regular-wednesday-leadership",
       title: "Grupo de liderazgo próximo",
-      date: wednesdayLeadershipStart,
-      descriptionBase:
-        "Espacio de formación y dirección para líderes, miércoles de 8:00 PM a 9:00 PM.",
+      description: `Espacio de formación y dirección para líderes, miércoles de 8:00 PM a 9:00 PM. ${formatAnnouncementDate(
+        wednesdayLeadershipStart
+      )}.`,
       type: "general" as const,
-      href: "/eventos",
-    },
-    {
-      id: "regular-thursday-prayer",
-      title: "Oración en línea próxima",
-      date: thursdayPrayerStart,
-      descriptionBase:
-        "Nuestra noche de oración será el jueves de 9:00 PM a 10:00 PM.",
-      type: "oracion" as const,
-      href: "/eventos",
-    },
-  ];
-
-  const regularAnnouncements: AppAnnouncement[] = regularCandidates
-    .filter((item) => isWithinNextHours(item.date, now, 48))
-    .map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: `${item.descriptionBase} ${formatAnnouncementDate(item.date)}.`,
-      type: item.type,
       source: "regular_event" as const,
-      createdAt: item.date.toISOString(),
-      isPriority: isWithinNextHours(item.date, now, 12),
-      href: item.href,
+      createdAt: wednesdayLeadershipStart.toISOString(),
+      isPriority: isWithinNextHours(wednesdayLeadershipStart, now, 12),
+      href: "/eventos",
       ctaLabel: null,
       ctaUrl: null,
-    }));
+    },
+  ].filter((item) => isWithinNextHours(new Date(item.createdAt), now, 72));
 
   const { data: specialData } = await supabase
     .from("events")
     .select(
-      "id,title,description,location,event_date,event_time,is_online,is_streamable,created_at,cta_label,cta_url"
+      "id,title,description,location,event_date,event_time,is_online,is_streamable,created_at,cta_label,cta_url,leader_name"
     )
     .order("event_date", { ascending: true })
-    .limit(20);
+    .limit(30);
 
   const specialEvents = (specialData ?? []) as SpecialEvent[];
 
-  const datedSpecialAnnouncements: AppAnnouncement[] = specialEvents
+  const prayerLeaderAnnouncements: AppAnnouncement[] = specialEvents
+    .filter((event) => event.title === "Noche de oración")
     .filter((event) => !!event.event_date)
     .map((event) => {
-      const parsed = parseTimeTo24Hour(event.event_time, 19, 0);
-      const baseDate = new Date(event.event_date as string);
-      const startsAt = buildDateTime(baseDate, parsed.hour, parsed.minute);
+      const startsAt = buildDateTime(event.event_date as string, event.event_time);
+      return {
+        id: `prayer-${event.id}`,
+        title: "Oración en línea próxima",
+        description: `Dirige: ${event.leader_name || "Por confirmar"}. ${
+          event.event_time || "9:00 PM"
+        }. ${formatAnnouncementDate(startsAt)}.`,
+        type: "oracion" as const,
+        source: "special_event" as const,
+        createdAt: startsAt.toISOString(),
+        isPriority: isWithinNextHours(startsAt, now, 12),
+        href: "/eventos",
+        ctaLabel: null,
+        ctaUrl: null,
+      };
+    })
+    .filter((item) => isWithinNextHours(new Date(item.createdAt), now, 72))
+    .slice(0, 2);
+
+  const datedSpecialAnnouncements: AppAnnouncement[] = specialEvents
+    .filter((event) => event.title !== "Noche de oración")
+    .filter((event) => !!event.event_date)
+    .map((event) => {
+      const startsAt = buildDateTime(event.event_date as string, event.event_time);
 
       const type: AppAnnouncement["type"] = event.is_streamable
         ? "en-vivo"
@@ -293,6 +307,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
   const merged: AppAnnouncement[] = [
     ...manualAnnouncements,
     ...regularAnnouncements,
+    ...prayerLeaderAnnouncements,
     ...datedSpecialAnnouncements,
     ...undatedSpecialAnnouncements,
   ];
