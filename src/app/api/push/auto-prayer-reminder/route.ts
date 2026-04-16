@@ -2,12 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
-
 type PrayerEvent = {
   id: number;
   title: string;
@@ -22,6 +16,41 @@ type PushSubscriptionRow = {
   auth: string;
   is_active: boolean;
 };
+
+function configureWebPush() {
+  const subject = process.env.VAPID_SUBJECT;
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+
+  if (!subject || !publicKey || !privateKey) {
+    return {
+      ok: false as const,
+      error:
+        "Faltan variables VAPID. Revisa VAPID_SUBJECT, NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY.",
+    };
+  }
+
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  return { ok: true as const };
+}
+
+function getAdminSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRole) {
+    return {
+      ok: false as const,
+      error:
+        "Faltan variables de Supabase. Revisa NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    client: createClient(url, serviceRole),
+  };
+}
 
 function getMexicoCityNow() {
   return new Date(
@@ -84,21 +113,35 @@ function formatSpanishDate(date: Date) {
 
 export async function GET() {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const vapid = configureWebPush();
+    if (!vapid.ok) {
+      return NextResponse.json(
+        { ok: false, error: vapid.error },
+        { status: 500 }
+      );
+    }
+
+    const supabaseAdmin = getAdminSupabase();
+    if (!supabaseAdmin.ok) {
+      return NextResponse.json(
+        { ok: false, error: supabaseAdmin.error },
+        { status: 500 }
+      );
+    }
 
     const now = getMexicoCityNow();
 
-    const { data: eventsData, error: eventsError } = await supabase
+    const { data: eventsData, error: eventsError } = await supabaseAdmin.client
       .from("events")
       .select("id,title,event_date,event_time,leader_name")
       .eq("title", "Noche de oración")
       .order("event_date", { ascending: true });
 
     if (eventsError) {
-      return NextResponse.json({ ok: false, error: eventsError.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: eventsError.message },
+        { status: 500 }
+      );
     }
 
     const events = ((eventsData ?? []) as PrayerEvent[])
@@ -113,13 +156,16 @@ export async function GET() {
     const nextPrayer = events[0];
 
     if (!nextPrayer) {
-      return NextResponse.json({ ok: true, skipped: true, reason: "No hay próxima oración." });
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "No hay próxima oración.",
+      });
     }
 
     const diffMs = nextPrayer.startsAt.getTime() - now.getTime();
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
-    // ventana de envío: entre 20 y 40 min antes
     if (diffMinutes < 20 || diffMinutes > 40) {
       return NextResponse.json({
         ok: true,
@@ -130,7 +176,7 @@ export async function GET() {
 
     const dedupeKey = `prayer-${nextPrayer.event_date}-${nextPrayer.event_time}`;
 
-    const { data: existingLog } = await supabase
+    const { data: existingLog } = await supabaseAdmin.client
       .from("push_delivery_log")
       .select("id")
       .eq("dedupe_key", dedupeKey)
@@ -144,13 +190,16 @@ export async function GET() {
       });
     }
 
-    const { data: subsData, error: subsError } = await supabase
+    const { data: subsData, error: subsError } = await supabaseAdmin.client
       .from("push_subscriptions")
       .select("endpoint,p256dh,auth,is_active")
       .eq("is_active", true);
 
     if (subsError) {
-      return NextResponse.json({ ok: false, error: subsError.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: subsError.message },
+        { status: 500 }
+      );
     }
 
     const subscriptions = (subsData ?? []) as PushSubscriptionRow[];
@@ -159,7 +208,9 @@ export async function GET() {
       title: "Comunidad VID",
       body: `Hoy hay oración en línea. Dirige ${
         nextPrayer.leader_name || "la persona asignada"
-      } a las ${nextPrayer.event_time || "9:00 PM"} · ${formatSpanishDate(nextPrayer.startsAt)}.`,
+      } a las ${nextPrayer.event_time || "9:00 PM"} · ${formatSpanishDate(
+        nextPrayer.startsAt
+      )}.`,
       url: "/eventos",
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
@@ -184,7 +235,7 @@ export async function GET() {
       } catch {
         failed++;
 
-        await supabase
+        await supabaseAdmin.client
           .from("push_subscriptions")
           .update({
             is_active: false,
@@ -194,7 +245,7 @@ export async function GET() {
       }
     }
 
-    await supabase.from("push_delivery_log").insert({
+    await supabaseAdmin.client.from("push_delivery_log").insert({
       kind: "prayer-reminder",
       dedupe_key: dedupeKey,
       payload: {
