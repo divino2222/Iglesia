@@ -1,0 +1,16 @@
+{
+  "id": "first-john",
+  "name": "1 Juan",
+  "shortName": "1 Jn",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}

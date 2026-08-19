@@ -1,0 +1,21 @@
+{
+  "id": "genesis",
+  "name": "Génesis",
+  "shortName": "Gn",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        { "verse": 1, "text": "En el principio creó Dios los cielos y la tierra." },
+        { "verse": 2, "text": "Y la tierra estaba desordenada y vacía..." },
+        { "verse": 3, "text": "Y dijo Dios: Sea la luz; y fue la luz." }
+      ]
+    },
+    {
+      "chapter": 2,
+      "verses": [
+        { "verse": 1, "text": "Fueron, pues, acabados los cielos y la tierra..." }
+      ]
+    }
+  ]
+}

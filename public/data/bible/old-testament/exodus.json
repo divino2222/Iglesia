@@ -1,0 +1,16 @@
+{
+  "id": "exodus",
+  "name": "Éxodo",
+  "shortName": "Ex",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}

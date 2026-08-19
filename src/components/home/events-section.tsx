@@ -5,9 +5,9 @@ import {
   Clock3,
   MapPin,
   MonitorPlay,
-  Sparkles,
   Trophy,
 } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/server";
 import { getChurchInfo } from "@/lib/church-info";
 import { churchMedia } from "@/lib/church-media";
@@ -45,7 +45,28 @@ type RegularHomeEvent = {
 
 function getMexicoCityNow() {
   return new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" })
+    new Date().toLocaleString("en-US", {
+      timeZone: "America/Mexico_City",
+    })
+  );
+}
+
+function parseLocalDate(
+  dateStr: string
+) {
+  const [year, month, day] =
+    dateStr
+      .split("-")
+      .map(Number);
+
+  return new Date(
+    year,
+    month - 1,
+    day,
+    0,
+    0,
+    0,
+    0
   );
 }
 
@@ -55,164 +76,359 @@ function getNextOccurrence(
   eventHour = 0,
   eventMinute = 0
 ) {
-  const result = new Date(baseDate);
-  const currentWeekday = result.getDay();
+  const result =
+    new Date(baseDate);
 
-  let diff = targetWeekday - currentWeekday;
-  if (diff < 0) diff += 7;
+  const currentWeekday =
+    result.getDay();
 
-  result.setDate(result.getDate() + diff);
-  result.setHours(eventHour, eventMinute, 0, 0);
+  let diff =
+    targetWeekday -
+    currentWeekday;
 
-  if (result.getTime() < baseDate.getTime()) {
-    result.setDate(result.getDate() + 7);
+  if (diff < 0) {
+    diff += 7;
+  }
+
+  result.setDate(
+    result.getDate() + diff
+  );
+
+  result.setHours(
+    eventHour,
+    eventMinute,
+    0,
+    0
+  );
+
+  if (
+    result.getTime() <
+    baseDate.getTime()
+  ) {
+    result.setDate(
+      result.getDate() + 7
+    );
   }
 
   return result;
 }
 
-function formatCardDate(date: Date) {
+function formatCardDate(
+  date: Date
+) {
   return {
-    weekday: date.toLocaleDateString("es-MX", {
-      weekday: "short",
-      timeZone: "America/Mexico_City",
-    }),
-    day: date.toLocaleDateString("es-MX", {
-      day: "numeric",
-      month: "short",
-      timeZone: "America/Mexico_City",
-    }),
+    weekday:
+      date.toLocaleDateString(
+        "es-MX",
+        {
+          weekday: "short",
+          timeZone:
+            "America/Mexico_City",
+        }
+      ),
+
+    day:
+      date.toLocaleDateString(
+        "es-MX",
+        {
+          day: "numeric",
+          month: "short",
+          timeZone:
+            "America/Mexico_City",
+        }
+      ),
   };
 }
 
-function formatSpecialDate(date: string | null) {
-  if (!date) return "Próximamente en junio";
+function formatSpecialDate(
+  date: string | null
+) {
+  if (!date) {
+    return "Fecha por confirmar";
+  }
 
-  return new Date(date).toLocaleDateString("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  return parseLocalDate(
+    date
+  ).toLocaleDateString(
+    "es-MX",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }
+  );
 }
 
-function formatSpecialTime(time: string | null) {
-  if (!time?.trim()) return "Horario por confirmar";
+function formatSpecialTime(
+  time: string | null
+) {
+  if (!time?.trim()) {
+    return "Horario por confirmar";
+  }
+
   return time;
 }
 
-function getSpecialImage(event: EventRow, index: number) {
-  if (event.image_url?.trim()) return event.image_url;
+function getSpecialImage(
+  event: EventRow,
+  index: number
+) {
+  if (
+    event.image_url?.trim()
+  ) {
+    return event.image_url;
+  }
 
-  const gallery = churchMedia.gallery?.length
-    ? churchMedia.gallery
-    : [churchMedia.heroImage];
+  const gallery =
+    churchMedia.gallery?.length
+      ? churchMedia.gallery
+      : [
+          churchMedia.heroImage,
+        ];
 
-  return gallery[index % gallery.length] || churchMedia.heroImage;
+  return (
+    gallery[
+      index %
+        gallery.length
+    ] ||
+    churchMedia.heroImage
+  );
 }
 
 export default async function EventsSection() {
-  const supabase = await createClient();
-  const churchInfo = await getChurchInfo();
-  const now = getMexicoCityNow();
+  const supabase =
+    await createClient();
+
+  const churchInfo =
+    await getChurchInfo();
+
+  const now =
+    getMexicoCityNow();
 
   const serviceAddress =
     churchInfo?.address ??
     "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";
 
-  const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
+  const whatsappNumber =
+    churchInfo?.whatsapp_number?.trim() ||
+    "525520035631";
 
-  const sundayDate = getNextOccurrence(0, now, 10, 0);
-  const tuesdayPrayerDate = getNextOccurrence(2, now, 21, 0);
-  const wednesdayLeadershipDate = getNextOccurrence(3, now, 20, 0);
-  const thursdayPrayerDate = getNextOccurrence(4, now, 21, 0);
+  const sundayDate =
+    getNextOccurrence(
+      0,
+      now,
+      11,
+      0
+    );
 
-  const regularEvents: RegularHomeEvent[] = [
+  const tuesdayPrayerDate =
+    getNextOccurrence(
+      2,
+      now,
+      20,
+      0
+    );
+
+  const thursdayPrayerDate =
+    getNextOccurrence(
+      4,
+      now,
+      20,
+      0
+    );
+
+  /*
+   * Primero declaramos el arreglo
+   * explícitamente como RegularHomeEvent[].
+   *
+   * Así TypeScript conserva los literales
+   * "location" y "online" correctamente.
+   */
+  const regularEvents:
+    RegularHomeEvent[] = [
     {
       id: "regular-sunday",
-      title: "Servicio dominical",
+      title:
+        "Servicio dominical",
       description:
         "Nuestra reunión principal de adoración, enseñanza bíblica y comunidad.",
-      location: serviceAddress,
+      location:
+        serviceAddress,
       date: sundayDate,
-      displayDate: formatCardDate(sundayDate),
-      displayTime: "Domingos · 10:00 AM a 1:00 PM · Presencial",
+      displayDate:
+        formatCardDate(
+          sundayDate
+        ),
+      displayTime:
+        "Domingos · 11:00 AM · Presencial",
       badge: "Servicio",
-      badgeClass: "bg-blue-100 text-blue-700",
-      modeIcon: "location" as const,
+      badgeClass:
+        "bg-blue-100 text-blue-700",
+      modeIcon:
+        "location",
     },
     {
       id: "regular-tuesday-prayer",
-      title: "Noche de oración",
-      description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
+      title:
+        "Noche de oración",
+      description:
+        "Un tiempo especial para buscar a Dios juntos como iglesia.",
       location: "En línea",
-      date: tuesdayPrayerDate,
-      displayDate: formatCardDate(tuesdayPrayerDate),
-      displayTime: "Martes · 9:00 PM a 10:00 PM · En línea",
+      date:
+        tuesdayPrayerDate,
+      displayDate:
+        formatCardDate(
+          tuesdayPrayerDate
+        ),
+      displayTime:
+        "Martes · 8:00 PM a 9:00 PM · En línea",
       badge: "Oración",
-      badgeClass: "bg-emerald-100 text-emerald-700",
-      modeIcon: "online" as const,
-    },
-    {
-      id: "regular-wednesday-leadership",
-      title: "Grupo de liderazgo",
-      description: "Espacio de formación, dirección y crecimiento para líderes.",
-      location: "En línea",
-      date: wednesdayLeadershipDate,
-      displayDate: formatCardDate(wednesdayLeadershipDate),
-      displayTime: "Miércoles · 8:00 PM a 9:00 PM · En línea",
-      badge: "Liderazgo",
-      badgeClass: "bg-amber-100 text-amber-700",
-      modeIcon: "online" as const,
+      badgeClass:
+        "bg-emerald-100 text-emerald-700",
+      modeIcon:
+        "online",
     },
     {
       id: "regular-thursday-prayer",
-      title: "Noche de oración",
-      description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
+      title:
+        "Noche de oración",
+      description:
+        "Un tiempo especial para buscar a Dios juntos como iglesia.",
       location: "En línea",
-      date: thursdayPrayerDate,
-      displayDate: formatCardDate(thursdayPrayerDate),
-      displayTime: "Jueves · 9:00 PM a 10:00 PM · En línea",
+      date:
+        thursdayPrayerDate,
+      displayDate:
+        formatCardDate(
+          thursdayPrayerDate
+        ),
+      displayTime:
+        "Jueves · 8:00 PM a 9:00 PM · En línea",
       badge: "Oración",
-      badgeClass: "bg-emerald-100 text-emerald-700",
-      modeIcon: "online" as const,
+      badgeClass:
+        "bg-emerald-100 text-emerald-700",
+      modeIcon:
+        "online",
     },
-  ].sort((a, b) => a.date.getTime() - b.date.getTime());
+  ];
 
-  const nextRegularEvent = regularEvents[0] ?? null;
+  regularEvents.sort(
+    (a, b) =>
+      a.date.getTime() -
+      b.date.getTime()
+  );
 
-  const { data } = await supabase.from("events").select("*").order("event_date", {
-    ascending: true,
-  });
+  const nextRegularEvent =
+    regularEvents[0] ??
+    null;
 
-  const rawSpecialEvents = (data ?? []) as EventRow[];
+  const { data } =
+    await supabase
+      .from("events")
+      .select("*")
+      .order(
+        "event_date",
+        {
+          ascending: true,
+        }
+      );
 
-  const datedSpecialEvents = rawSpecialEvents
-    .filter((event) => event.event_date)
-    .filter((event) => new Date(event.event_date as string) >= now)
-    .sort(
-      (a, b) =>
-        new Date(a.event_date as string).getTime() -
-        new Date(b.event_date as string).getTime()
+  const rawSpecialEvents =
+    (
+      (data ?? []) as EventRow[]
+    ).filter(
+      (event) =>
+        !event.title
+          .toLowerCase()
+          .includes(
+            "liderazgo"
+          )
     );
 
-  const undatedSpecialEvents = rawSpecialEvents.filter((event) => !event.event_date);
+  const datedSpecialEvents =
+    rawSpecialEvents
+      .filter(
+        (event) =>
+          event.event_date
+      )
+      .filter((event) => {
+        if (
+          !event.event_date
+        ) {
+          return false;
+        }
 
-  const homeSpecialEvents = [...datedSpecialEvents.slice(0, 1), ...undatedSpecialEvents].slice(
-    0,
-    2
-  );
+        const eventDate =
+          parseLocalDate(
+            event.event_date
+          );
+
+        eventDate.setHours(
+          23,
+          59,
+          59,
+          999
+        );
+
+        return (
+          eventDate >= now
+        );
+      })
+      .sort(
+        (
+          a,
+          b
+        ) => {
+          const dateA =
+            parseLocalDate(
+              a.event_date as string
+            ).getTime();
+
+          const dateB =
+            parseLocalDate(
+              b.event_date as string
+            ).getTime();
+
+          return (
+            dateA -
+            dateB
+          );
+        }
+      );
+
+  const undatedSpecialEvents =
+    rawSpecialEvents.filter(
+      (event) =>
+        !event.event_date
+    );
+
+  const homeSpecialEvents =
+    [
+      ...datedSpecialEvents.slice(
+        0,
+        2
+      ),
+      ...undatedSpecialEvents,
+    ].slice(
+      0,
+      3
+    );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-xl font-semibold text-stone-950">Próximos eventos</h3>
+        <h3 className="text-xl font-semibold text-stone-950">
+          Próximos eventos
+        </h3>
 
         <Link
           href="/eventos"
           className="inline-flex items-center gap-1 text-sm font-medium text-stone-600 transition hover:text-stone-900"
         >
           Ver todos
-          <ChevronRight size={16} />
+
+          <ChevronRight
+            size={16}
+          />
         </Link>
       </div>
 
@@ -221,7 +437,10 @@ export default async function EventsSection() {
           <div className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)] transition-all duration-300 hover:shadow-xl">
             <div className="bg-gradient-to-r from-stone-950 via-stone-900 to-stone-800 p-4 text-white">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-200">
-                <CalendarDays size={12} />
+                <CalendarDays
+                  size={12}
+                />
+
                 Próximo evento
               </div>
             </div>
@@ -230,10 +449,19 @@ export default async function EventsSection() {
               <div className="flex items-start gap-4">
                 <div className="flex h-[78px] w-[78px] shrink-0 flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-stone-100 to-white ring-1 ring-stone-200">
                   <span className="text-[10px] font-semibold uppercase text-stone-500">
-                    {nextRegularEvent.displayDate.weekday}
+                    {
+                      nextRegularEvent
+                        .displayDate
+                        .weekday
+                    }
                   </span>
+
                   <span className="mt-1 text-lg font-bold text-stone-900">
-                    {nextRegularEvent.displayDate.day}
+                    {
+                      nextRegularEvent
+                        .displayDate
+                        .day
+                    }
                   </span>
                 </div>
 
@@ -242,31 +470,66 @@ export default async function EventsSection() {
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${nextRegularEvent.badgeClass}`}
                     >
-                      {nextRegularEvent.badge}
+                      {
+                        nextRegularEvent
+                          .badge
+                      }
                     </span>
                   </div>
 
                   <h4 className="text-xl font-semibold text-stone-900">
-                    {nextRegularEvent.title}
+                    {
+                      nextRegularEvent
+                        .title
+                    }
                   </h4>
 
                   <div className="mt-3 space-y-2 text-sm text-stone-600">
                     <div className="flex items-center gap-2">
-                      <Clock3 size={15} className="text-stone-400" />
-                      <span>{nextRegularEvent.displayTime}</span>
+                      <Clock3
+                        size={15}
+                        className="text-stone-400"
+                      />
+
+                      <span>
+                        {
+                          nextRegularEvent
+                            .displayTime
+                        }
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {nextRegularEvent.modeIcon === "online" ? (
-                        <MonitorPlay size={15} className="text-stone-400" />
+                      {nextRegularEvent.modeIcon ===
+                      "online" ? (
+                        <MonitorPlay
+                          size={
+                            15
+                          }
+                          className="text-stone-400"
+                        />
                       ) : (
-                        <MapPin size={15} className="text-stone-400" />
+                        <MapPin
+                          size={
+                            15
+                          }
+                          className="text-stone-400"
+                        />
                       )}
-                      <span className="line-clamp-1">{nextRegularEvent.location}</span>
+
+                      <span className="line-clamp-1">
+                        {
+                          nextRegularEvent
+                            .location
+                        }
+                      </span>
                     </div>
 
                     <p className="pt-1 leading-6 text-stone-600">
-                      {nextRegularEvent.description}
+                      {
+                        nextRegularEvent
+                          .description
+                      }
                     </p>
                   </div>
 
@@ -276,7 +539,12 @@ export default async function EventsSection() {
                       className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
                     >
                       Ver detalle
-                      <ChevronRight size={16} />
+
+                      <ChevronRight
+                        size={
+                          16
+                        }
+                      />
                     </Link>
                   </div>
                 </div>
@@ -285,87 +553,137 @@ export default async function EventsSection() {
           </div>
         ) : null}
 
-        {homeSpecialEvents.map((event, index) => {
-          const isUndated = !event.event_date;
-          const registerUrl =
-            event.cta_url ||
-            `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-              `Hola, quiero registrarme al evento "${event.title}" de Comunidad VID.`
-            )}`;
+        {homeSpecialEvents.map(
+          (
+            event,
+            index
+          ) => {
+            const isUndated =
+              !event.event_date;
 
-          return (
-            <div
-              key={`special-home-${event.id}`}
-              className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)] transition-all duration-300 hover:shadow-xl"
-            >
+            const registerUrl =
+              event.cta_url ||
+              `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+                `Hola, quiero registrarme al evento "${event.title}" de Comunidad VID.`
+              )}`;
+
+            return (
               <div
-                className="h-32"
-                style={{
-                  backgroundImage: `url(${getSpecialImage(event, index)})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              />
+                key={`special-home-${event.id}`}
+                className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)] transition-all duration-300 hover:shadow-xl"
+              >
+                <div
+                  className="h-32"
+                  style={{
+                    backgroundImage: `url(${getSpecialImage(
+                      event,
+                      index
+                    )})`,
+                    backgroundSize:
+                      "cover",
+                    backgroundPosition:
+                      "center",
+                  }}
+                />
 
-              <div className="p-5">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                    Especial
-                  </span>
-
-                  {isUndated ? (
-                    <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                      Próximamente
+                <div className="p-5">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                      Especial
                     </span>
+
+                    {isUndated ? (
+                      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        Próximamente
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <h4 className="text-lg font-semibold text-stone-900">
+                    {
+                      event.title
+                    }
+                  </h4>
+
+                  <div className="mt-3 space-y-2 text-sm text-stone-600">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays
+                        size={
+                          15
+                        }
+                        className="text-stone-400"
+                      />
+
+                      <span>
+                        {formatSpecialDate(
+                          event.event_date
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Clock3
+                        size={
+                          15
+                        }
+                        className="text-stone-400"
+                      />
+
+                      <span>
+                        {formatSpecialTime(
+                          event.event_time
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Trophy
+                        size={
+                          15
+                        }
+                        className="text-stone-400"
+                      />
+
+                      <span>
+                        {event.location ||
+                          "Sede por confirmar"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {event.description ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-600">
+                      {
+                        event.description
+                      }
+                    </p>
                   ) : null}
-                </div>
 
-                <h4 className="text-lg font-semibold text-stone-900">{event.title}</h4>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      href="/eventos"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
+                    >
+                      Ver detalle
+                    </Link>
 
-                <div className="mt-3 space-y-2 text-sm text-stone-600">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays size={15} className="text-stone-400" />
-                    <span>{formatSpecialDate(event.event_date)}</span>
+                    <Link
+                      href={
+                        registerUrl
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
+                    >
+                      {event.cta_label ||
+                        "Regístrate"}
+                    </Link>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <Clock3 size={15} className="text-stone-400" />
-                    <span>{formatSpecialTime(event.event_time)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Trophy size={15} className="text-stone-400" />
-                    <span>{event.location || "Sede por confirmar"}</span>
-                  </div>
-                </div>
-
-                {event.description ? (
-                  <p className="mt-3 text-sm leading-6 text-stone-600">
-                    {event.description}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Link
-                    href="/eventos"
-                    className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
-                  >
-                    Ver detalle
-                  </Link>
-
-                  <Link
-                    href={registerUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
-                  >
-                    {event.cta_label || "Regístrate"}
-                  </Link>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          }
+        )}
       </div>
     </div>
   );

@@ -189,34 +189,19 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
     };
   });
 
-  const sundayStart = getNextOccurrenceWithTime(0, 10, 0, now);
-  const wednesdayLeadershipStart = getNextOccurrenceWithTime(3, 20, 0, now);
+  const sundayStart = getNextOccurrenceWithTime(0, 11, 0, now);
 
   const regularAnnouncements: AppAnnouncement[] = [
     {
       id: "regular-sunday",
       title: "Servicio dominical próximo",
-      description: `Te esperamos en Comunidad VID este domingo de 10:00 AM a 1:00 PM. ${formatAnnouncementDate(
+      description: `Te esperamos en Comunidad VID este domingo de 11:00 AM a 1:00 PM. ${formatAnnouncementDate(
         sundayStart
       )}.`,
       type: "evento" as const,
       source: "regular_event" as const,
       createdAt: sundayStart.toISOString(),
       isPriority: isWithinNextHours(sundayStart, now, 12),
-      href: "/eventos",
-      ctaLabel: null,
-      ctaUrl: null,
-    },
-    {
-      id: "regular-wednesday-leadership",
-      title: "Grupo de liderazgo próximo",
-      description: `Espacio de formación y dirección para líderes, miércoles de 8:00 PM a 9:00 PM. ${formatAnnouncementDate(
-        wednesdayLeadershipStart
-      )}.`,
-      type: "general" as const,
-      source: "regular_event" as const,
-      createdAt: wednesdayLeadershipStart.toISOString(),
-      isPriority: isWithinNextHours(wednesdayLeadershipStart, now, 12),
       href: "/eventos",
       ctaLabel: null,
       ctaUrl: null,
@@ -242,7 +227,7 @@ export async function getAppAnnouncements(): Promise<AppAnnouncement[]> {
         id: `prayer-${event.id}`,
         title: "Oración en línea próxima",
         description: `Dirige: ${event.leader_name || "Por confirmar"}. ${
-          event.event_time || "9:00 PM"
+          event.event_time || "8:00 PM"
         }. ${formatAnnouncementDate(startsAt)}.`,
         type: "oracion" as const,
         source: "special_event" as const,

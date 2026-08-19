@@ -34,3 +34,21 @@ video {
 img {
   display: block;
 }
+@keyframes realtime-progress {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes notification-progress {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}

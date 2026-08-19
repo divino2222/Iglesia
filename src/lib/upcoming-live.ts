@@ -84,7 +84,6 @@ function getNextOccurrence(
 
   const end = new Date(result.getTime() + durationMinutes * 60 * 1000);
 
-  // si el evento de hoy ya terminó, brincar a la próxima semana
   if (end.getTime() <= now.getTime()) {
     result.setDate(result.getDate() + 7);
   }
@@ -114,59 +113,52 @@ export async function getUpcomingLiveItem(): Promise<UpcomingLiveItem | null> {
       description: "Acompáñanos en nuestra reunión de oración en línea.",
       modeLabel: "En línea",
       href: "/en-vivo",
-      ...getNextOccurrence(2, now, 21, 0, 60), // martes 9 a 10
-    },
-    {
-      title: "Grupo de liderazgo en línea",
-      description: "Espacio de formación, dirección y crecimiento para líderes.",
-      modeLabel: "En línea",
-      href: "/en-vivo",
-      ...getNextOccurrence(3, now, 20, 0, 60), // miércoles 8 a 9
+      ...getNextOccurrence(2, now, 20, 0, 60),
     },
     {
       title: "Noche de oración",
       description: "Acompáñanos en nuestra reunión de oración en línea.",
       modeLabel: "En línea",
       href: "/en-vivo",
-      ...getNextOccurrence(4, now, 21, 0, 60), // jueves 9 a 10
+      ...getNextOccurrence(4, now, 20, 0, 60),
     },
     {
       title: "Transmisión del servicio dominical",
       description: "Acompaña a Comunidad VID en nuestro servicio principal.",
       modeLabel: "Presencial + en vivo",
       href: "/en-vivo",
-      ...getNextOccurrence(0, now, 10, 0, 180), // domingo 10 a 1
+      ...getNextOccurrence(0, now, 11, 0, 120),
     },
   ];
 
   const { data } = await supabase
     .from("events")
-    .select("id,title,description,event_date,event_time,is_online,is_streamable,stream_url")
+    .select(
+      "id,title,description,event_date,event_time,is_online,is_streamable,stream_url"
+    )
     .eq("is_streamable", true)
     .order("event_date", { ascending: true });
 
-  const specialStreamCandidates =
-    ((data ?? []) as SpecialEventRow[])
-      .filter((event) => !!event.event_date)
-      .map((event) => {
-        const parsed = parseTimeTo24Hour(event.event_time, 19, 0);
-        const start = parseLocalDate(event.event_date as string);
-        start.setHours(parsed.hour, parsed.minute, 0, 0);
+  const specialStreamCandidates = ((data ?? []) as SpecialEventRow[])
+    .filter((event) => !!event.event_date)
+    .map((event) => {
+      const parsed = parseTimeTo24Hour(event.event_time, 19, 0);
+      const start = parseLocalDate(event.event_date as string);
+      start.setHours(parsed.hour, parsed.minute, 0, 0);
 
-        const end = new Date(start);
-        end.setHours(end.getHours() + 2);
+      const end = new Date(start);
+      end.setHours(end.getHours() + 2);
 
-        return {
-          title: event.title,
-          description: event.description || "Evento especial en transmisión.",
-          modeLabel: event.is_online ? "En línea" : "Transmisión especial",
-          href: "/en-vivo",
-          start,
-          end,
-        };
-      })
-      // solo deja eventos que no hayan terminado
-      .filter((event) => event.end.getTime() > now.getTime());
+      return {
+        title: event.title,
+        description: event.description || "Evento especial en transmisión.",
+        modeLabel: event.is_online ? "En línea" : "Transmisión especial",
+        href: "/en-vivo",
+        start,
+        end,
+      };
+    })
+    .filter((event) => event.end.getTime() > now.getTime());
 
   const allCandidates = [...regularCandidates, ...specialStreamCandidates].sort(
     (a, b) => a.start.getTime() - b.start.getTime()

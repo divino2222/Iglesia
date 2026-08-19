@@ -1,0 +1,16 @@
+{
+  "id": "proverbs",
+  "name": "Proverbios",
+  "shortName": "Pr",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}

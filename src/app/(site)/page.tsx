@@ -1,12 +1,11 @@
 import HomeHero from "@/components/home/home-hero";
 import QuickActions from "@/components/home/quick-actions";
-import LiveUpcomingCard from "@/components/home/live-upcoming-card";
+import PrayerPremiumPanel from "@/components/prayer/prayer-premium-panel";
 import SundayInviteBanner from "@/components/home/sunday-invite-banner";
 import EventsSection from "@/components/home/events-section";
 import SermonsSection from "@/components/home/sermons-section";
 import ChurchInfoCard from "@/components/home/church-info-card";
 import ChurchGalleryPreview from "@/components/home/church-gallery-preview";
-import PrayerLeaderCard from "@/components/home/prayer-leader-card";
 import SectionHeading from "@/components/ui/section-heading";
 import HomeOnboarding from "@/components/onboarding/home-onboarding";
 import InstallAppPrompt from "@/components/pwa/install-app-prompt";
@@ -30,10 +29,10 @@ export default function HomePage() {
             title="Transmisión y acceso rápido"
             subtitle="Acompáñanos en vivo o entra rápido a las secciones principales."
           />
+
           <div className="space-y-4">
-            <LiveUpcomingCard />
+            <PrayerPremiumPanel />
             <QuickActions />
-            <PrayerLeaderCard />
           </div>
         </section>
 
@@ -43,6 +42,7 @@ export default function HomePage() {
             title="Reúnete con nosotros"
             subtitle="Encuentra el próximo servicio presencial y cómo llegar."
           />
+
           <div className="space-y-4">
             <SundayInviteBanner />
             <ChurchInfoCard />
@@ -55,6 +55,7 @@ export default function HomePage() {
             title="Nuestra comunidad"
             subtitle="Imágenes reales de la vida de la iglesia."
           />
+
           <ChurchGalleryPreview />
         </section>
 
@@ -64,6 +65,7 @@ export default function HomePage() {
             title="Próximos eventos"
             subtitle="Primero verás el evento más cercano y después los especiales de la comunidad."
           />
+
           <EventsSection />
         </section>
 
@@ -73,6 +75,7 @@ export default function HomePage() {
             title="Últimas predicaciones"
             subtitle="Mensajes recientes para fortalecer tu fe."
           />
+
           <SermonsSection />
         </section>
       </div>

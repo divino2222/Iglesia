@@ -12,9 +12,14 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll() {
-          // Por ahora no necesitamos escribir cookies
-          // porque solo vamos a leer datos públicos
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // Puede fallar en Server Components; middleware lo manejaría después.
+          }
         },
       },
     }

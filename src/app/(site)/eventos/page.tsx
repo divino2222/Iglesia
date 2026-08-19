@@ -1,14 +1,12 @@
 import Link from "next/link";
 import {
   CalendarDays,
-  ChevronRight,
+  Clock3,
   MapPin,
   MonitorPlay,
-  Clock3,
-  Sparkles,
-  HeartHandshake,
-  Users,
+  Trophy,
   Church,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getChurchInfo } from "@/lib/church-info";
@@ -29,63 +27,21 @@ type EventRow = {
   cta_url: string | null;
 };
 
-type EventType = "servicio" | "oracion" | "liderazgo";
-
-type RecurringEvent = {
-  title: string;
-  description: string;
-  location: string;
-  weekday: number;
-  time: string;
-  type: EventType;
-  image: string;
-};
-
 function getMexicoCityNow() {
   return new Date(
     new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" })
   );
 }
 
-function getNextOccurrence(
-  targetWeekday: number,
-  baseDate: Date,
-  eventHour = 0,
-  eventMinute = 0
-) {
-  const result = new Date(baseDate);
-  const currentWeekday = result.getDay();
-
-  let diff = targetWeekday - currentWeekday;
-  if (diff < 0) diff += 7;
-
-  result.setDate(result.getDate() + diff);
-  result.setHours(eventHour, eventMinute, 0, 0);
-
-  if (result.getTime() < baseDate.getTime()) {
-    result.setDate(result.getDate() + 7);
-  }
-
-  return result;
+function parseLocalDate(dateStr: string) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
 }
 
-function formatCardDate(date: Date) {
-  const weekday = date.toLocaleDateString("es-MX", {
-    weekday: "short",
-    timeZone: "America/Mexico_City",
-  });
+function formatDate(date: string | null) {
+  if (!date) return "Fecha por confirmar";
 
-  const day = date.toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "short",
-    timeZone: "America/Mexico_City",
-  });
-
-  return { weekday, day };
-}
-
-function formatEventDate(date: string) {
-  return new Date(date).toLocaleDateString("es-MX", {
+  return parseLocalDate(date).toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -93,48 +49,12 @@ function formatEventDate(date: string) {
   });
 }
 
-function getBadgeStyles(type: string) {
-  switch (type) {
-    case "servicio":
-      return "bg-blue-100 text-blue-700";
-    case "oracion":
-      return "bg-emerald-100 text-emerald-700";
-    case "liderazgo":
-      return "bg-amber-100 text-amber-700";
-    case "especial":
-      return "bg-violet-100 text-violet-700";
-    default:
-      return "bg-stone-100 text-stone-700";
-  }
+function formatTime(time: string | null) {
+  if (!time?.trim()) return "Horario por confirmar";
+  return time;
 }
 
-function getTypeLabel(type: EventType) {
-  switch (type) {
-    case "servicio":
-      return "Servicio";
-    case "oracion":
-      return "Oración";
-    case "liderazgo":
-      return "Liderazgo";
-    default:
-      return "Evento";
-  }
-}
-
-function getRegularEventImage(type: EventType) {
-  switch (type) {
-    case "servicio":
-      return churchMedia.heroImage;
-    case "oracion":
-      return churchMedia.gallery[1] || churchMedia.heroImage;
-    case "liderazgo":
-      return churchMedia.gallery[0] || churchMedia.heroImage;
-    default:
-      return churchMedia.heroImage;
-  }
-}
-
-function getSpecialEventImage(event: EventRow, index: number) {
+function getEventImage(event: EventRow, index: number) {
   if (event.image_url?.trim()) return event.image_url;
 
   const gallery = churchMedia.gallery?.length
@@ -144,93 +64,86 @@ function getSpecialEventImage(event: EventRow, index: number) {
   return gallery[index % gallery.length] || churchMedia.heroImage;
 }
 
-function formatSpecialEventDate(event: EventRow) {
-  if (!event.event_date) return "Próximamente en junio";
-  return formatEventDate(event.event_date);
+function getWhatsappUrl(
+  whatsappNumber: string,
+  eventTitle: string,
+  customUrl?: string | null
+) {
+  if (customUrl?.trim()) return customUrl;
+
+  return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+    `Hola, quiero solicitar información sobre el evento "${eventTitle}" de Comunidad VID.`
+  )}`;
 }
 
-function formatSpecialEventTime(event: EventRow) {
-  if (!event.event_time?.trim()) return "Horario por confirmar";
-  return event.event_time;
-}
-
-export default async function EventsPage() {
+export default async function EventosPage() {
   const supabase = await createClient();
   const churchInfo = await getChurchInfo();
-
-  const serviceAddress =
-    churchInfo?.address ??
-    "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";
-
   const now = getMexicoCityNow();
 
-  const recurringEvents: RecurringEvent[] = [
+  const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
+
+  const serviceAddress =
+    churchInfo?.address ||
+    "Josefa Ortiz de Domínguez MZ99 LT1212, Sta María Aztahuacan, Iztapalapa, 09570 Ciudad de México, CDMX";
+
+  const sunday = new Date(now);
+  const diff = (7 - sunday.getDay()) % 7;
+  sunday.setDate(sunday.getDate() + diff);
+  sunday.setHours(11, 0, 0, 0);
+
+  if (sunday.getTime() < now.getTime()) {
+    sunday.setDate(sunday.getDate() + 7);
+  }
+
+  const tuesday = new Date(now);
+  let tuesdayDiff = 2 - tuesday.getDay();
+  if (tuesdayDiff < 0) tuesdayDiff += 7;
+  tuesday.setDate(tuesday.getDate() + tuesdayDiff);
+  tuesday.setHours(20, 0, 0, 0);
+
+  const thursday = new Date(now);
+  let thursdayDiff = 4 - thursday.getDay();
+  if (thursdayDiff < 0) thursdayDiff += 7;
+  thursday.setDate(thursday.getDate() + thursdayDiff);
+  thursday.setHours(20, 0, 0, 0);
+
+  const regularEvents = [
+    {
+      title: "Noche de oración",
+      badge: "Oración",
+      date: tuesday,
+      time: "Martes · 8:00 PM a 9:00 PM · En línea",
+      location: "En línea",
+      description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
+      icon: MonitorPlay,
+      whatsappText:
+        "Hola, quiero solicitar información sobre la noche de oración de Comunidad VID.",
+    },
+    {
+      title: "Noche de oración",
+      badge: "Oración",
+      date: thursday,
+      time: "Jueves · 8:00 PM a 9:00 PM · En línea",
+      location: "En línea",
+      description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
+      icon: MonitorPlay,
+      whatsappText:
+        "Hola, quiero solicitar información sobre la noche de oración de Comunidad VID.",
+    },
     {
       title: "Servicio dominical",
+      badge: "Servicio",
+      date: sunday,
+      time: "Domingos · 11:00 AM · Presencial",
+      location: serviceAddress,
       description:
         "Nuestra reunión principal de adoración, enseñanza bíblica y comunidad.",
-      location: serviceAddress,
-      weekday: 0,
-      time: "Domingos · 10:00 AM a 1:00 PM · Presencial",
-      type: "servicio",
-      image: getRegularEventImage("servicio"),
+      icon: Church,
+      whatsappText:
+        "Hola, quiero solicitar información sobre el servicio dominical de Comunidad VID.",
     },
-    {
-      title: "Noche de oración",
-      description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
-      location: "En línea",
-      weekday: 2,
-      time: "Martes · 9:00 PM a 10:00 PM · En línea",
-      type: "oracion",
-      image: getRegularEventImage("oracion"),
-    },
-    {
-      title: "Grupo de liderazgo",
-      description:
-        "Espacio de formación, dirección y crecimiento para líderes.",
-      location: "En línea",
-      weekday: 3,
-      time: "Miércoles · 8:00 PM a 9:00 PM · En línea",
-      type: "liderazgo",
-      image: getRegularEventImage("liderazgo"),
-    },
-    {
-      title: "Noche de oración",
-      description: "Un tiempo especial para buscar a Dios juntos como iglesia.",
-      location: "En línea",
-      weekday: 4,
-      time: "Jueves · 9:00 PM a 10:00 PM · En línea",
-      type: "oracion",
-      image: getRegularEventImage("oracion"),
-    },
-  ];
-
-  const upcomingRegularEvents = recurringEvents
-    .map((event) => {
-      let hour = 0;
-      let minute = 0;
-
-      if (event.type === "servicio") {
-        hour = 10;
-        minute = 0;
-      }
-
-      if (event.type === "oracion") {
-        hour = 21;
-        minute = 0;
-      }
-
-      if (event.type === "liderazgo") {
-        hour = 20;
-        minute = 0;
-      }
-
-      return {
-        ...event,
-        date: getNextOccurrence(event.weekday, now, hour, minute),
-      };
-    })
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const { data } = await supabase
     .from("events")
@@ -238,283 +151,206 @@ export default async function EventsPage() {
     .order("event_date", { ascending: true });
 
   const specialEvents = ((data ?? []) as EventRow[])
+    .filter((event) => !event.title.toLowerCase().includes("liderazgo"))
     .filter((event) => {
       if (!event.event_date) return true;
-      const eventDate = new Date(event.event_date);
-      return eventDate >= new Date(now.toDateString());
-    })
-    .sort((a, b) => {
-      if (!a.event_date && !b.event_date) return 0;
-      if (!a.event_date) return 1;
-      if (!b.event_date) return -1;
-      return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+
+      const eventDate = parseLocalDate(event.event_date);
+      eventDate.setHours(23, 59, 59, 999);
+
+      return eventDate >= now;
     });
 
-  const whatsappNumber = churchInfo?.whatsapp_number?.trim() || "525520035631";
-
   return (
-    <div className="px-4 py-6">
-      <div className="mb-7">
+    <div className="space-y-8 px-4 py-6">
+      <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-400">
           Agenda
         </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-stone-950">
+
+        <h1 className="text-3xl font-semibold tracking-tight text-stone-950">
           Eventos
         </h1>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          Mantente al día con reuniones regulares, encuentros especiales y espacios de comunidad en Comunidad VID.
-        </p>
-      </div>
 
-      <div className="space-y-8">
-        <section>
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
-              <Church size={18} />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-stone-950">
-                Reuniones regulares
-              </h2>
-              <p className="text-sm text-stone-500">
-                Espacios semanales para crecer, conectar y caminar en comunidad.
-              </p>
-            </div>
+        <p className="text-sm leading-6 text-stone-600">
+          Mantente al día con reuniones regulares, encuentros especiales y
+          espacios de comunidad en Comunidad VID.
+        </p>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <CalendarDays size={20} />
           </div>
 
-          <div className="space-y-4">
-            {upcomingRegularEvents.map((event, index) => {
-              const { weekday, day } = formatCardDate(event.date);
-              const isOnline = event.location === "En línea";
-              const onlineRequestUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-                `Hola, me gustaría recibir acceso a la reunión en línea de Comunidad VID.`
-              )}`;
+          <div>
+            <h2 className="text-xl font-semibold text-stone-950">
+              Reuniones regulares
+            </h2>
+            <p className="text-sm leading-6 text-stone-600">
+              Espacios semanales para crecer, conectar y caminar en comunidad.
+            </p>
+          </div>
+        </div>
 
-              return (
+        <div className="space-y-4">
+          {regularEvents.map((event, index) => {
+            const Icon = event.icon;
+            const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+              event.whatsappText
+            )}`;
+
+            return (
+              <article
+                key={`${event.title}-${index}`}
+                className="overflow-hidden rounded-[32px] border border-stone-200 bg-white shadow-[0_14px_34px_rgba(0,0,0,0.06)]"
+              >
                 <div
-                  key={`${event.title}-${event.weekday}-${index}`}
-                  className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)] transition-all duration-300 hover:scale-[1.01] hover:shadow-xl"
-                >
-                  <div
-                    className="h-32"
-                    style={{
-                      backgroundImage: `url(${event.image})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }}
-                  />
+                  className="h-36"
+                  style={{
+                    backgroundImage: `url(${churchMedia.heroImage})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                />
 
-                  <div className="p-5">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-[72px] w-[72px] shrink-0 flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-stone-100 to-white ring-1 ring-stone-200">
-                        <span className="text-[10px] font-semibold uppercase text-stone-500">
-                          {weekday}
-                        </span>
-                        <span className="mt-1 text-base font-bold text-stone-900">
-                          {day}
-                        </span>
-                      </div>
+                <div className="p-5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {event.badge}
+                    </span>
+                  </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-center gap-2">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getBadgeStyles(
-                              event.type
-                            )}`}
-                          >
-                            {getTypeLabel(event.type)}
-                          </span>
-                        </div>
+                  <h3 className="text-xl font-semibold text-stone-950">
+                    {event.title}
+                  </h3>
 
-                        <h3 className="text-lg font-semibold text-stone-900">
-                          {event.title}
-                        </h3>
-
-                        <div className="mt-3 space-y-2 text-sm text-stone-600">
-                          <div className="flex items-center gap-2">
-                            <Clock3 size={15} className="text-stone-400" />
-                            <span>{event.time}</span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {isOnline ? (
-                              <MonitorPlay size={15} className="text-stone-400" />
-                            ) : (
-                              <MapPin size={15} className="text-stone-400" />
-                            )}
-                            <span className="line-clamp-1">{event.location}</span>
-                          </div>
-
-                          <div className="flex items-start gap-2">
-                            {event.type === "oracion" ? (
-                              <HeartHandshake
-                                size={15}
-                                className="mt-0.5 text-stone-400"
-                              />
-                            ) : (
-                              <Users size={15} className="mt-0.5 text-stone-400" />
-                            )}
-                            <span className="line-clamp-3 leading-6">
-                              {event.description}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <Link
-                            href="/eventos"
-                            className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
-                          >
-                            Ver detalle
-                            <ChevronRight size={16} />
-                          </Link>
-
-                          {isOnline ? (
-                            <Link
-                              href={onlineRequestUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-100"
-                            >
-                              <MonitorPlay size={16} />
-                              Solicitar acceso
-                            </Link>
-                          ) : null}
-                        </div>
-                      </div>
+                  <div className="mt-3 space-y-2 text-sm text-stone-600">
+                    <div className="flex items-center gap-2">
+                      <Clock3 size={15} className="text-stone-400" />
+                      <span>{event.time}</span>
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <Icon size={15} className="text-stone-400" />
+                      <span>{event.location}</span>
+                    </div>
+
+                    <p className="pt-1 leading-6">{event.description}</p>
+                  </div>
+
+                  <div className="mt-4">
+                    <Link
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center rounded-2xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800"
+                    >
+                      Solicitar información
+                    </Link>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
-        <section>
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-stone-950">
-                Eventos especiales
-              </h2>
-              <p className="text-sm text-stone-500">
-                Actividades, reuniones y encuentros programados especialmente.
-              </p>
-            </div>
+      <section className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
+            <Sparkles size={20} />
           </div>
 
-          {specialEvents.length === 0 ? (
-            <div className="rounded-[30px] border border-stone-200 bg-white p-5 shadow-[0_14px_30px_rgba(0,0,0,0.06)]">
-              <p className="text-sm text-stone-600">
-                Por ahora no hay eventos especiales publicados.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {specialEvents.map((event, index) => {
-                const onlineRequestUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-                  `Hola, me gustaría recibir acceso al evento en línea "${event.title}" de Comunidad VID.`
-                )}`;
+          <div>
+            <h2 className="text-xl font-semibold text-stone-950">
+              Eventos especiales
+            </h2>
+            <p className="text-sm leading-6 text-stone-600">
+              Actividades, reuniones y encuentros programados especialmente.
+            </p>
+          </div>
+        </div>
 
-                return (
-                  <div
-                    key={event.id}
-                    className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)] transition-all duration-300 hover:scale-[1.01] hover:shadow-xl"
-                  >
-                    <div
-                      className="h-32"
-                      style={{
-                        backgroundImage: `url(${getSpecialEventImage(
-                          event,
-                          index
-                        )})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }}
-                    />
+        <div className="space-y-4">
+          {specialEvents.map((event, index) => {
+            const infoUrl = getWhatsappUrl(
+              whatsappNumber,
+              event.title,
+              event.cta_url
+            );
 
-                    <div className="p-5">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                          Especial
-                        </span>
+            return (
+              <article
+                key={event.id}
+                className="overflow-hidden rounded-[32px] border border-stone-200 bg-white shadow-[0_14px_34px_rgba(0,0,0,0.06)]"
+              >
+                <div
+                  className="h-40"
+                  style={{
+                    backgroundImage: `url(${getEventImage(event, index)})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                />
 
-                        {event.is_online ? (
-                          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                            En línea
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
-                            Presencial
-                          </span>
-                        )}
-                      </div>
+                <div className="p-5">
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
+                      Especial
+                    </span>
+                    <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
+                      Presencial
+                    </span>
+                  </div>
 
-                      <h3 className="text-lg font-semibold text-stone-900">
-                        {event.title}
-                      </h3>
+                  <h3 className="text-xl font-semibold text-stone-950">
+                    {event.title}
+                  </h3>
 
-                      <div className="mt-3 space-y-2 text-sm text-stone-600">
-                        <div className="flex items-center gap-2">
-                          <CalendarDays size={15} className="text-stone-400" />
-                          <span>{formatSpecialEventDate(event)}</span>
-                        </div>
+                  <div className="mt-3 space-y-2 text-sm text-stone-600">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays size={15} className="text-stone-400" />
+                      <span>{formatDate(event.event_date)}</span>
+                    </div>
 
-                        <div className="flex items-center gap-2">
-                          <Clock3 size={15} className="text-stone-400" />
-                          <span>{formatSpecialEventTime(event)}</span>
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <Clock3 size={15} className="text-stone-400" />
+                      <span>{formatTime(event.event_time)}</span>
+                    </div>
 
-                        <div className="flex items-center gap-2">
-                          {event.is_online ? (
-                            <MonitorPlay size={15} className="text-stone-400" />
-                          ) : (
-                            <MapPin size={15} className="text-stone-400" />
-                          )}
-                          <span>{event.location || "Sede por confirmar"}</span>
-                        </div>
-                      </div>
-
-                      {event.description ? (
-                        <p className="mt-3 text-sm leading-6 text-stone-600">
-                          {event.description}
-                        </p>
-                      ) : null}
-
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        {event.is_online ? (
-                          <Link
-                            href={onlineRequestUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-100"
-                          >
-                            <MonitorPlay size={16} />
-                            Solicitar acceso
-                          </Link>
-                        ) : null}
-
-                        {event.cta_url && event.cta_label ? (
-                          <Link
-                            href={event.cta_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
-                          >
-                            {event.cta_label}
-                          </Link>
-                        ) : null}
-                      </div>
+                    <div className="flex items-start gap-2">
+                      <MapPin
+                        size={15}
+                        className="mt-0.5 shrink-0 text-stone-400"
+                      />
+                      <span>{event.location || "Sede por confirmar"}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
+
+                  {event.description ? (
+                    <p className="mt-4 text-sm leading-6 text-stone-600">
+                      {event.description}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-4">
+                    <Link
+                      href={infoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center rounded-2xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800"
+                    >
+                      {event.cta_label || "Solicitar información"}
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

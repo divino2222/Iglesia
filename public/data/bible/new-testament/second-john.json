@@ -1,0 +1,16 @@
+{
+  "id": "second-john",
+  "name": "2 Juan",
+  "shortName": "2 Jn",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}

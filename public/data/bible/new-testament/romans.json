@@ -1,0 +1,14 @@
+{
+  "id": "romans",
+  "name": "Romanos",
+  "shortName": "Ro",
+  "chapters": [
+    {
+      "chapter": 8,
+      "verses": [
+        { "verse": 1, "text": "Ahora, pues, ninguna condenación hay para los que están en Cristo Jesús..." },
+        { "verse": 2, "text": "Porque la ley del Espíritu de vida en Cristo Jesús..." }
+      ]
+    }
+  ]
+}

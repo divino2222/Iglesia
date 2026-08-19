@@ -3,25 +3,50 @@
 import Image from "next/image";
 import { Bell, Menu } from "lucide-react";
 import { useState } from "react";
+
 import MobileMenuDrawer from "@/components/layout/mobile-menu-drawer";
 import NotificationsDrawer from "@/components/layout/notifications-drawer";
+
 import type { AppAnnouncement } from "@/lib/announcements";
+
+type AccessLink = {
+  href: string;
+  label: string;
+};
 
 type Props = {
   churchName?: string;
   announcements?: AppAnnouncement[];
+
+  userName?: string | null;
+  roleLabel?: string | null;
+  accessLinks?: AccessLink[];
 };
 
 export default function Header({
   churchName = "Comunidad VID",
   announcements = [],
+  userName = null,
+  roleLabel = null,
+  accessLinks = [],
 }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const [
+    notificationsOpen,
+    setNotificationsOpen,
+  ] = useState(false);
 
   const count = announcements.length;
-  const hasNotifications = count > 0;
-  const displayCount = count > 9 ? "9+" : String(count);
+
+  const hasNotifications =
+    count > 0;
+
+  const displayCount =
+    count > 9
+      ? "9+"
+      : String(count);
 
   return (
     <>
@@ -43,8 +68,11 @@ export default function Header({
               <p className="truncate text-sm font-semibold tracking-tight text-stone-950">
                 {churchName}
               </p>
+
               <p className="truncate text-xs text-stone-500">
-                Bienvenido
+                {userName
+                  ? `Hola, ${userName}`
+                  : "Bienvenido"}
               </p>
             </div>
           </div>
@@ -52,18 +80,25 @@ export default function Header({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setNotificationsOpen(true)}
+              onClick={() =>
+                setNotificationsOpen(
+                  true
+                )
+              }
               className="relative rounded-2xl p-2.5 text-stone-600 transition hover:bg-white/80 active:scale-95"
               aria-label="Notificaciones"
             >
               <Bell size={18} />
+
               {hasNotifications ? (
                 <>
                   <span className="absolute right-0 top-0 min-w-[18px] rounded-full bg-red-500 px-1.5 py-[1px] text-center text-[10px] font-semibold leading-4 text-white shadow-sm">
                     {displayCount}
                   </span>
+
                   <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+
                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
                   </span>
                 </>
@@ -72,7 +107,9 @@ export default function Header({
 
             <button
               type="button"
-              onClick={() => setMenuOpen(true)}
+              onClick={() =>
+                setMenuOpen(true)
+              }
               className="rounded-2xl p-2.5 text-stone-700 transition hover:bg-white/80 active:scale-95"
               aria-label="Abrir menú"
             >
@@ -84,13 +121,19 @@ export default function Header({
 
       <MobileMenuDrawer
         open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        churchName={churchName}
+        onClose={() =>
+          setMenuOpen(false)
+        }
+        userName={userName}
+        roleLabel={roleLabel}
+        accessLinks={accessLinks}
       />
 
       <NotificationsDrawer
         open={notificationsOpen}
-        onClose={() => setNotificationsOpen(false)}
+        onClose={() =>
+          setNotificationsOpen(false)
+        }
         items={announcements}
       />
     </>

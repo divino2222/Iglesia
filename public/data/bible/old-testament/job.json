@@ -1,0 +1,16 @@
+{
+  "id": "job",
+  "name": "Job",
+  "shortName": "Job",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "first-peter",
+  "name": "1 Pedro",
+  "shortName": "1 P",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}

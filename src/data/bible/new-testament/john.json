@@ -1,0 +1,20 @@
+{
+  "id": "john",
+  "name": "Juan",
+  "shortName": "Jn",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        { "verse": 1, "text": "En el principio era el Verbo..." },
+        { "verse": 2, "text": "Este era en el principio con Dios." }
+      ]
+    },
+    {
+      "chapter": 3,
+      "verses": [
+        { "verse": 16, "text": "Porque de tal manera amó Dios al mundo..." }
+      ]
+    }
+  ]
+}

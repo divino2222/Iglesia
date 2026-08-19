@@ -1,0 +1,16 @@
+{
+  "id": "psalms",
+  "name": "Salmos",
+  "shortName": "Sal",
+  "chapters": [
+    {
+      "chapter": 1,
+      "verses": [
+        {
+          "verse": 1,
+          "text": "PENDIENTE"
+        }
+      ]
+    }
+  ]
+}
