@@ -1,184 +1,120 @@
 "use client";
 
+import { useState } from "react";
 import {
-  BellRing,
+  Bell,
   CheckCircle2,
-  Loader2,
+  LoaderCircle,
   TriangleAlert,
 } from "lucide-react";
 
-import {
-  useState,
-} from "react";
-
-type TestResult = {
-  ok?: boolean;
-  sent?: number;
-  failed?: number;
-  message?: string;
-  error?: string;
-};
+type State =
+  | "idle"
+  | "sending"
+  | "success"
+  | "error";
 
 export default function PushTestButton() {
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
-
-  const [
-    result,
-    setResult,
-  ] = useState<TestResult | null>(
-    null
-  );
+  const [state, setState] = useState<State>("idle");
+  const [message, setMessage] = useState("");
 
   async function sendTest() {
-    if (loading) {
-      return;
-    }
-
-    setLoading(true);
-    setResult(null);
+    setState("sending");
+    setMessage("");
 
     try {
-      const response =
-        await fetch(
-          "/api/push/test",
-          {
-            method: "POST",
+      const response = await fetch("/api/push/test", {
+        method: "POST",
+      });
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-          }
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        setState("error");
+
+        setMessage(
+          result.error ||
+            "No pudimos enviar la notificación."
         );
-
-      const data =
-        (await response
-          .json()
-          .catch(
-            () => null
-          )) as TestResult | null;
-
-      if (!response.ok) {
-        setResult({
-          ok: false,
-
-          error:
-            data?.error ||
-            "No se pudo enviar la notificación.",
-        });
 
         return;
       }
 
-      setResult(
-        data ?? {
-          ok: false,
-          error:
-            "El servidor no devolvió una respuesta válida.",
-        }
-      );
-    } catch (error) {
-      setResult({
-        ok: false,
+      setState("success");
 
-        error:
-          error instanceof Error
-            ? error.message
-            : "Ocurrió un error enviando la prueba.",
-      });
-    } finally {
-      setLoading(false);
+      setMessage(
+        result.sent === 1
+          ? "Notificación enviada a este dispositivo."
+          : `Notificación enviada a ${result.sent} dispositivos.`
+      );
+    } catch {
+      setState("error");
+
+      setMessage(
+        "No pudimos comunicarnos con el servidor."
+      );
     }
   }
 
   return (
-    <section className="rounded-[30px] border border-violet-200 bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.06)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-600">
-        Prueba temporal
-      </p>
+    <div className="rounded-[28px] border border-stone-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+          <Bell size={19} />
+        </div>
 
-      <h2 className="mt-2 text-xl font-semibold text-stone-950">
-        Notificaciones Push
-      </h2>
+        <div>
+          <p className="font-semibold text-stone-950">
+            Probar notificaciones
+          </p>
 
-      <p className="mt-2 text-sm leading-6 text-stone-600">
-        Envía una notificación real a los dispositivos
-        registrados con tu cuenta.
-      </p>
+          <p className="mt-1 text-xs leading-5 text-stone-500">
+            Envía un aviso real a los dispositivos vinculados con tu cuenta.
+          </p>
+        </div>
+      </div>
 
       <button
         type="button"
+        disabled={state === "sending"}
         onClick={sendTest}
-        disabled={loading}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[20px] bg-stone-950 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[20px] bg-stone-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {loading ? (
+        {state === "sending" ? (
           <>
-            <Loader2
-              size={18}
+            <LoaderCircle
+              size={17}
               className="animate-spin"
             />
-
             Enviando...
           </>
         ) : (
           <>
-            <BellRing
-              size={18}
-            />
-
+            <Bell size={17} />
             Enviar notificación de prueba
           </>
         )}
       </button>
 
-      {result?.ok ? (
-        <div className="mt-4 flex items-start gap-3 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+      {state === "success" ? (
+        <div className="mt-3 flex gap-2 rounded-[18px] bg-emerald-50 p-3 text-sm text-emerald-700">
           <CheckCircle2
-            size={20}
+            size={17}
             className="mt-0.5 shrink-0"
           />
-
-          <div>
-            <p className="font-semibold">
-              Notificación enviada
-            </p>
-
-            <p className="mt-1 text-xs leading-5">
-              Enviadas:{" "}
-              {result.sent ?? 0}
-              {" · "}
-              Fallidas:{" "}
-              {result.failed ?? 0}
-            </p>
-          </div>
+          {message}
         </div>
       ) : null}
 
-      {result &&
-      result.ok === false ? (
-        <div className="mt-4 flex items-start gap-3 rounded-[20px] border border-red-200 bg-red-50 p-4 text-red-700">
+      {state === "error" ? (
+        <div className="mt-3 flex gap-2 rounded-[18px] bg-amber-50 p-3 text-sm text-amber-800">
           <TriangleAlert
-            size={20}
+            size={17}
             className="mt-0.5 shrink-0"
           />
-
-          <div>
-            <p className="font-semibold">
-              No se pudo enviar
-            </p>
-
-            <p className="mt-1 text-xs leading-5">
-              {result.error ||
-                result.message ||
-                "Ocurrió un error."}
-            </p>
-          </div>
+          {message}
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

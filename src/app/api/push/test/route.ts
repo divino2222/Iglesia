@@ -1,54 +1,19 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
-
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type PushSubscriptionRow = {
+export const runtime = "nodejs";
+
+type StoredSubscription = {
+  id: string;
   endpoint: string;
   p256dh: string;
   auth: string;
-  is_active: boolean;
 };
-
-type WebPushError = {
-  statusCode?: number;
-  body?: string;
-  message?: string;
-  headers?: Record<string, string>;
-};
-
-function configureWebPush() {
-  const subject = process.env.VAPID_SUBJECT;
-  const publicKey =
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey =
-    process.env.VAPID_PRIVATE_KEY;
-
-  if (!subject || !publicKey || !privateKey) {
-    return {
-      ok: false as const,
-      error: "Faltan variables VAPID.",
-    };
-  }
-
-  webpush.setVapidDetails(
-    subject,
-    publicKey,
-    privateKey
-  );
-
-  return {
-    ok: true as const,
-  };
-}
 
 export async function POST() {
   try {
-    /* =====================================================
-       1. USUARIO
-    ====================================================== */
-
     const supabase = await createClient();
 
     const {
@@ -62,229 +27,139 @@ export async function POST() {
           ok: false,
           error: "Debes iniciar sesión.",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-    /* =====================================================
-       2. VAPID
-    ====================================================== */
+    /*
+     * IMPORTANTE:
+     * Las variables se validan dentro del handler.
+     * Así no tumbamos el build de Vercel.
+     */
+    const subject = process.env.VAPID_SUBJECT;
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-    const vapid = configureWebPush();
-
-    if (!vapid.ok) {
+    if (!subject || !publicKey || !privateKey) {
       return NextResponse.json(
         {
           ok: false,
-          error: vapid.error,
+          error:
+            "La configuración VAPID no está completa en el servidor.",
         },
-        {
-          status: 500,
-        }
+        { status: 503 }
       );
     }
 
-    /* =====================================================
-       3. SUSCRIPCIONES
-    ====================================================== */
+    webpush.setVapidDetails(
+      subject,
+      publicKey,
+      privateKey
+    );
 
     const admin = createAdminClient();
 
-    const {
-      data,
-      error,
-    } = await admin
+    const { data, error } = await admin
       .from("push_subscriptions")
-      .select(
-        `
-        endpoint,
-        p256dh,
-        auth,
-        is_active
-        `
-      )
-      .eq(
-        "auth_user_id",
-        user.id
-      )
-      .eq(
-        "is_active",
-        true
-      );
+      .select("id,endpoint,p256dh,auth")
+      .eq("user_id", user.id);
 
     if (error) {
+      console.error(error);
+
       return NextResponse.json(
         {
           ok: false,
-          error: error.message,
+          error: "No se pudieron consultar tus dispositivos.",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       );
     }
 
     const subscriptions =
-      (data ?? []) as PushSubscriptionRow[];
+      (data ?? []) as StoredSubscription[];
 
     if (subscriptions.length === 0) {
       return NextResponse.json(
         {
           ok: false,
           error:
-            "No hay dispositivos registrados para este usuario.",
+            "No encontramos ningún dispositivo vinculado a esta cuenta.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    /* =====================================================
-       4. PAYLOAD
-    ====================================================== */
-
     const payload = JSON.stringify({
       title: "Comunidad VID",
-
-      body:
-        "Las notificaciones ya están funcionando 🙌",
-
-      url: "/mi-cuenta",
-
-      icon:
-  "/icons/icon-192.png",
-
-badge:
-  "/icons/icon-192.png",
-
-      tag:
-        "comunidad-vid-test",
-
-      requireInteraction: false,
+      body: "¡Las notificaciones funcionan! 🙌",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      url: "/",
+      tag: "push-test",
     });
 
-    /* =====================================================
-       5. ENVÍO + DIAGNÓSTICO
-    ====================================================== */
-
     let sent = 0;
+    let removed = 0;
     let failed = 0;
 
-    const errors: Array<{
-      statusCode: number | null;
-      message: string;
-      body: string | null;
-    }> = [];
-
-    for (const sub of subscriptions) {
+    for (const item of subscriptions) {
       try {
-        const response =
-          await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
+        await webpush.sendNotification(
+          {
+            endpoint: item.endpoint,
 
-              keys: {
-                p256dh: sub.p256dh,
-                auth: sub.auth,
-              },
+            keys: {
+              p256dh: item.p256dh,
+              auth: item.auth,
             },
-
-            payload
-          );
-
-        console.log(
-          "PUSH ENVIADO:",
-          response.statusCode
+          },
+          payload
         );
 
         sent++;
-      } catch (error) {
-        failed++;
-
-        const pushError =
-          error as WebPushError;
-
-        console.error(
-          "WEB PUSH ERROR:",
-          {
-            statusCode:
-              pushError.statusCode,
-
-            message:
-              pushError.message,
-
-            body:
-              pushError.body,
-          }
-        );
-
-        errors.push({
-          statusCode:
-            pushError.statusCode ??
-            null,
-
-          message:
-            pushError.message ??
-            "Error desconocido",
-
-          body:
-            pushError.body ??
-            null,
-        });
+      } catch (error: any) {
+        const statusCode = error?.statusCode;
 
         /*
-         * IMPORTANTE:
-         *
-         * Durante el diagnóstico NO desactivamos
-         * automáticamente la suscripción.
-         *
-         * Primero queremos conocer el error real.
+         * 404 / 410 significa normalmente que esa
+         * suscripción ya dejó de existir.
          */
+        if (statusCode === 404 || statusCode === 410) {
+          await admin
+            .from("push_subscriptions")
+            .delete()
+            .eq("id", item.id);
+
+          removed++;
+          continue;
+        }
+
+        console.error(
+          "Error enviando push:",
+          error
+        );
+
+        failed++;
       }
     }
 
-    /* =====================================================
-       6. RESULTADO
-    ====================================================== */
-
     return NextResponse.json({
       ok: sent > 0,
-
       sent,
-
+      removed,
       failed,
-
-      subscriptions:
-        subscriptions.length,
-
-      errors,
-
-      message:
-        sent > 0
-          ? "Notificación enviada."
-          : "No se pudo enviar ninguna notificación.",
     });
   } catch (error) {
-    console.error(
-      "PUSH TEST ERROR GENERAL:",
-      error
-    );
+    console.error("POST /api/push/test:", error);
 
     return NextResponse.json(
       {
         ok: false,
-
         error:
-          error instanceof Error
-            ? error.message
-            : "Error interno.",
+          "No fue posible enviar la notificación de prueba.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

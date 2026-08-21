@@ -7,7 +7,7 @@ import SermonsSection from "@/components/home/sermons-section";
 import ChurchInfoCard from "@/components/home/church-info-card";
 import ChurchGalleryPreview from "@/components/home/church-gallery-preview";
 import HomePriorityStack from "@/components/home/home-priority-stack";
-import PushTestButton from "@/components/pwa/push-test-button";
+import PushUserSync from "@/components/pwa/push-user-sync";
 
 import SectionHeading from "@/components/ui/section-heading";
 
@@ -28,13 +28,14 @@ export default function HomePage() {
 
       <FloatingInstallButton />
 
+      <PushUserSync />
+
       <div className="space-y-8 px-4 py-6">
         {/* =====================================================
             HERO
         ====================================================== */}
 
         <HomeHero />
-        <PushTestButton />
 
         {/* =====================================================
             PRIORIDADES PERSONALES Y CONTEXTUALES
