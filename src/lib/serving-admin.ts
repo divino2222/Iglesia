@@ -1,31 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getAppTodayString } from "@/lib/date-time";
 
-export type ServiceStatus = "ready" | "pending" | "attention";
+export type ServiceStatus =
+  | "ready"
+  | "pending"
+  | "attention";
 
 export type AssignmentStatus =
   | "pending"
   | "confirmed"
   | "change_requested";
 
-export type ProfileRow = {
-  id: string;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
-  photo_url: string | null;
-  role: string;
-  ministries: string[] | null;
-  is_active: boolean;
-};
-
-export type MinistryRow = {
-  id: string;
-  name: string;
-  emoji: string | null;
-  color: string | null;
-  is_active: boolean;
-};
+/* =========================================================
+   PLAN DEL SERVICIO
+========================================================= */
 
 export type ServicePlanRow = {
   id: string;
@@ -38,7 +26,12 @@ export type ServicePlanRow = {
   verse: string | null;
   notes: string | null;
   status: ServiceStatus;
+  created_at?: string | null;
 };
+
+/* =========================================================
+   EQUIPOS
+========================================================= */
 
 export type ServiceTeamRow = {
   id: string;
@@ -51,169 +44,329 @@ export type ServiceTeamRow = {
   status: ServiceStatus;
   members: string[] | null;
   checklist: string[] | null;
+  created_at?: string | null;
 };
+
+/* =========================================================
+   PERFILES / SERVIDORES
+========================================================= */
+
+export type ProfileRow = {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  photo_url: string | null;
+  ministries: string[] | null;
+  is_active: boolean;
+
+  /*
+   * Vinculación con Supabase Auth
+   */
+  auth_user_id: string | null;
+  email: string | null;
+
+  created_at?: string | null;
+};
+
+/* =========================================================
+   ASIGNACIONES / RESPUESTAS
+========================================================= */
 
 export type AssignmentRow = {
   id: string;
   service_plan_id: string;
   team_id: string;
   profile_id: string;
-  role: string;
   status: AssignmentStatus;
   note: string | null;
-  confirmed_at: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  resolution_status: "open" | "resolved";
-  resolution_note: string | null;
-  resolved_at: string | null;
-  resolved_by: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
-export type ActivityLogRow = {
+/* =========================================================
+   CHECKLIST INDIVIDUAL
+========================================================= */
+
+export type AssignmentChecklistRow = {
   id: string;
-  created_at: string;
-  profile_id: string | null;
-  actor_name: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  service_plan_id: string | null;
-  team_id: string | null;
-  description: string;
-  metadata: Record<string, unknown> | null;
+  assignment_id: string;
+  item: string;
+  completed: boolean;
+  completed_at: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
-function getMexicoCityTodayIso() {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Mexico_City",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+/* =========================================================
+   RESPUESTA COMPLETA DEL ADMIN
+========================================================= */
 
-  return formatter.format(new Date());
-}
+export type ServingAdminData = {
+  plan: ServicePlanRow | null;
+  plans: ServicePlanRow[];
+  teams: ServiceTeamRow[];
+  profiles: ProfileRow[];
+  assignments: AssignmentRow[];
+  assignmentChecklist: AssignmentChecklistRow[];
+};
 
-export async function getServingAdminData(selectedPlanId?: string) {
+/* =========================================================
+   OBTENER DATOS DEL PANEL
+========================================================= */
+
+export async function getServingAdminData(
+  selectedPlanId?: string
+): Promise<ServingAdminData> {
   const supabase = await createClient();
-  const admin = createAdminClient();
 
-  const [
-    plansResult,
-    profilesResult,
-    ministriesResult,
-  ] = await Promise.all([
-    supabase
-      .from("service_plans")
-      .select("*")
-      .order("service_date", { ascending: true }),
+  /* =======================================================
+     1. TODOS LOS PLANES
+  ======================================================= */
 
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("is_active", true)
-      .order("full_name", { ascending: true }),
+  const {
+    data: plansData,
+    error: plansError,
+  } = await supabase
+    .from("service_plans")
+    .select("*")
+    .order("service_date", {
+      ascending: false,
+    });
 
-    supabase
-      .from("ministries")
-      .select("*")
-      .eq("is_active", true)
-      .order("name", { ascending: true }),
-  ]);
-
-  if (plansResult.error) {
+  if (plansError) {
     throw new Error(
-      `No se pudieron consultar los servicios: ${plansResult.error.message}`
+      `No se pudieron cargar los servicios: ${plansError.message}`
     );
   }
 
-  if (profilesResult.error) {
+  const plans =
+    (plansData ?? []) as ServicePlanRow[];
+
+  /* =======================================================
+     2. DETERMINAR QUÉ PLAN EDITAR
+  ======================================================= */
+
+  let plan: ServicePlanRow | null = null;
+
+  if (selectedPlanId) {
+    plan =
+      plans.find(
+        (item) =>
+          item.id === selectedPlanId
+      ) ?? null;
+  }
+
+  /*
+   * Si no se eligió un plan manualmente:
+   *
+   * buscamos primero el próximo servicio.
+   * Si no existe uno futuro, usamos el más reciente.
+   */
+
+  if (!plan && plans.length > 0) {
+    const today = getAppTodayString();
+
+    const upcomingPlans = [
+      ...plans,
+    ]
+      .filter(
+        (item) =>
+          item.service_date >= today
+      )
+      .sort((a, b) =>
+        a.service_date.localeCompare(
+          b.service_date
+        )
+      );
+
+    if (
+      upcomingPlans.length > 0
+    ) {
+      plan = upcomingPlans[0];
+    } else {
+      plan = plans[0];
+    }
+  }
+
+  /* =======================================================
+     3. PERFILES ACTIVOS
+  ======================================================= */
+
+  const {
+    data: profilesData,
+    error: profilesError,
+  } = await supabase
+    .from("profiles")
+    .select(
+      `
+      id,
+      full_name,
+      phone,
+      photo_url,
+      ministries,
+      is_active,
+      auth_user_id,
+      email,
+      created_at
+      `
+    )
+    .eq("is_active", true)
+    .order("full_name", {
+      ascending: true,
+    });
+
+  if (profilesError) {
     throw new Error(
-      `No se pudieron consultar las personas: ${profilesResult.error.message}`
+      `No se pudieron cargar los perfiles: ${profilesError.message}`
     );
   }
 
-  if (ministriesResult.error) {
-    throw new Error(
-      `No se pudieron consultar los ministerios: ${ministriesResult.error.message}`
-    );
-  }
+  const profiles =
+    (profilesData ?? []) as ProfileRow[];
 
-  const plans = (plansResult.data ?? []) as ServicePlanRow[];
-  const profiles = (profilesResult.data ?? []) as ProfileRow[];
-  const ministries = (ministriesResult.data ?? []) as MinistryRow[];
+  /* =======================================================
+     SI TODAVÍA NO HAY PLAN
+  ======================================================= */
 
-  const todayIso = getMexicoCityTodayIso();
-
-  const selectedPlan =
-    plans.find((item) => item.id === selectedPlanId) ??
-    plans.find((item) => item.service_date >= todayIso) ??
-    plans[plans.length - 1] ??
-    null;
-
-  if (!selectedPlan) {
+  if (!plan) {
     return {
       plan: null,
       plans,
-      teams: [] as ServiceTeamRow[],
+      teams: [],
       profiles,
-      ministries,
-      assignments: [] as AssignmentRow[],
-      activities: [] as ActivityLogRow[],
+      assignments: [],
+      assignmentChecklist: [],
     };
   }
 
-  const [
-    teamsResult,
-    assignmentsResult,
-    activitiesResult,
-  ] = await Promise.all([
-    supabase
-      .from("service_teams")
-      .select("*")
-      .eq("service_plan_id", selectedPlan.id)
-      .order("team_name", { ascending: true }),
+  /* =======================================================
+     4. EQUIPOS DEL PLAN SELECCIONADO
+  ======================================================= */
 
-    admin
-      .from("service_assignments")
-      .select("*")
-      .eq("service_plan_id", selectedPlan.id)
-      .order("updated_at", { ascending: false }),
+  const {
+    data: teamsData,
+    error: teamsError,
+  } = await supabase
+    .from("service_teams")
+    .select("*")
+    .eq(
+      "service_plan_id",
+      plan.id
+    )
+    .order("team_name", {
+      ascending: true,
+    });
 
-    admin
-      .from("activity_log")
-      .select("*")
-      .eq("service_plan_id", selectedPlan.id)
-      .order("created_at", { ascending: false })
-      .limit(12),
-  ]);
-
-  if (teamsResult.error) {
+  if (teamsError) {
     throw new Error(
-      `No se pudieron consultar los equipos: ${teamsResult.error.message}`
+      `No se pudieron cargar los equipos: ${teamsError.message}`
     );
   }
 
-  if (assignmentsResult.error) {
+  const teams =
+    (teamsData ?? []) as ServiceTeamRow[];
+
+  /* =======================================================
+     5. ASIGNACIONES DEL PLAN SELECCIONADO
+  ======================================================= */
+
+  const {
+    data: assignmentsData,
+    error: assignmentsError,
+  } = await supabase
+    .from("assignments")
+    .select(
+      `
+      id,
+      service_plan_id,
+      team_id,
+      profile_id,
+      status,
+      note,
+      created_at,
+      updated_at
+      `
+    )
+    .eq(
+      "service_plan_id",
+      plan.id
+    );
+
+  if (assignmentsError) {
     throw new Error(
-      `No se pudieron consultar las respuestas: ${assignmentsResult.error.message}`
+      `No se pudieron cargar las asignaciones: ${assignmentsError.message}`
     );
   }
 
-  if (activitiesResult.error) {
-    throw new Error(
-      `No se pudo consultar la actividad: ${activitiesResult.error.message}`
+  const assignments =
+    (assignmentsData ??
+      []) as AssignmentRow[];
+
+  /* =======================================================
+     6. CHECKLIST INDIVIDUAL DE LAS ASIGNACIONES
+  ======================================================= */
+
+  const assignmentIds =
+    assignments.map(
+      (assignment) =>
+        assignment.id
     );
+
+  let assignmentChecklist: AssignmentChecklistRow[] =
+    [];
+
+  /*
+   * Evitamos hacer .in() con un arreglo vacío.
+   */
+  if (assignmentIds.length > 0) {
+    const {
+      data: checklistData,
+      error: checklistError,
+    } = await supabase
+      .from(
+        "assignment_checklist"
+      )
+      .select(
+        `
+        id,
+        assignment_id,
+        item,
+        completed,
+        completed_at,
+        created_at,
+        updated_at
+        `
+      )
+      .in(
+        "assignment_id",
+        assignmentIds
+      );
+
+    if (checklistError) {
+      throw new Error(
+        `No se pudo cargar el progreso de preparación: ${checklistError.message}`
+      );
+    }
+
+    assignmentChecklist =
+      (checklistData ??
+        []) as AssignmentChecklistRow[];
   }
+
+  /* =======================================================
+     7. RESPUESTA COMPLETA
+  ======================================================= */
 
   return {
-    plan: selectedPlan,
+    plan,
     plans,
-    teams: (teamsResult.data ?? []) as ServiceTeamRow[],
+    teams,
     profiles,
-    ministries,
-    assignments: (assignmentsResult.data ?? []) as AssignmentRow[],
-    activities: (activitiesResult.data ?? []) as ActivityLogRow[],
+    assignments,
+    assignmentChecklist,
   };
 }
+
+/* =========================================================
+   FECHA LOCAL YYYY-MM-DD
+========================================================= */

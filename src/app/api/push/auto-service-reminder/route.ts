@@ -3,22 +3,17 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToAuthUser } from "@/lib/push/server";
 
-import {
-  formatAppDate,
-  getAppTodayString,
-  getDaysUntil,
-} from "@/lib/date-time";
+type AssignmentStatus =
+  | "pending"
+  | "confirmed"
+  | "change_requested";
 
-/* =========================================================
-   TIPOS
-========================================================= */
-
-type PendingAssignmentRow = {
+type AssignmentRow = {
   id: string;
   profile_id: string;
   service_plan_id: string;
   team_id: string;
-  status: string;
+  status: AssignmentStatus;
 
   profiles:
     | {
@@ -38,13 +33,13 @@ type PendingAssignmentRow = {
         id: string;
         service_date: string;
         title: string;
-        service_time: string;
+        service_time: string | null;
       }
     | {
         id: string;
         service_date: string;
         title: string;
-        service_time: string;
+        service_time: string | null;
       }[]
     | null;
 
@@ -53,11 +48,13 @@ type PendingAssignmentRow = {
         id: string;
         team_name: string;
         arrival_time: string | null;
+        service_time: string | null;
       }
     | {
         id: string;
         team_name: string;
         arrival_time: string | null;
+        service_time: string | null;
       }[]
     | null;
 };
@@ -81,39 +78,121 @@ function firstRelation<T>(
 }
 
 /* =========================================================
-   SEGURIDAD DEL CRON
-
-   En producción:
-   CRON_SECRET debe existir en variables de entorno.
-
-   En desarrollo permitimos localhost para poder probar.
+   HOY EN CDMX
 ========================================================= */
 
-function isAuthorized(request: Request) {
-  const secret =
-    process.env.CRON_SECRET;
+function getMexicoCityToday() {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          "America/Mexico_City",
 
-  const authorization =
-    request.headers.get(
-      "authorization"
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).formatToParts(
+      new Date()
     );
 
-  const isDevelopment =
-    process.env.NODE_ENV !==
-    "production";
+  const values =
+    Object.fromEntries(
+      parts.map(
+        (part) => [
+          part.type,
+          part.value,
+        ]
+      )
+    );
 
-  if (isDevelopment) {
-    return true;
-  }
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
-  if (!secret) {
-    return false;
-  }
+/* =========================================================
+   DIFERENCIA DE DÍAS
+========================================================= */
 
-  return (
-    authorization ===
-    `Bearer ${secret}`
+function getDaysUntil(
+  targetDate: string
+) {
+  const today =
+    getMexicoCityToday();
+
+  const [
+    todayYear,
+    todayMonth,
+    todayDay,
+  ] = today
+    .split("-")
+    .map(Number);
+
+  const [
+    targetYear,
+    targetMonth,
+    targetDay,
+  ] = targetDate
+    .split("-")
+    .map(Number);
+
+  const todayUTC =
+    Date.UTC(
+      todayYear,
+      todayMonth - 1,
+      todayDay
+    );
+
+  const targetUTC =
+    Date.UTC(
+      targetYear,
+      targetMonth - 1,
+      targetDay
+    );
+
+  return Math.round(
+    (targetUTC -
+      todayUTC) /
+      86_400_000
   );
+}
+
+/* =========================================================
+   FORMATEAR FECHA
+========================================================= */
+
+function formatServiceDate(
+  dateValue: string
+) {
+  const [
+    year,
+    month,
+    day,
+  ] = dateValue
+    .split("-")
+    .map(Number);
+
+  const date =
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        day,
+        12
+      )
+    );
+
+  return new Intl.DateTimeFormat(
+    "es-MX",
+    {
+      timeZone:
+        "America/Mexico_City",
+
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }
+  ).format(date);
 }
 
 /* =========================================================
@@ -125,39 +204,77 @@ export async function GET(
 ) {
   try {
     /* =====================================================
-       1. SEGURIDAD
+       0. SEGURIDAD DEL CRON
+
+       LOCALHOST:
+       Permitimos ejecutar manualmente la URL.
+
+       PRODUCCIÓN:
+       Vercel debe enviar:
+       Authorization: Bearer <CRON_SECRET>
     ====================================================== */
 
-    if (
-      !isAuthorized(request)
-    ) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "No autorizado.",
-        },
-        {
-          status: 401,
-        }
-      );
+    const isProduction =
+      process.env.NODE_ENV ===
+      "production";
+
+    if (isProduction) {
+      const cronSecret =
+        process.env.CRON_SECRET;
+
+      if (!cronSecret) {
+        console.error(
+          "CRON_SECRET no está configurado."
+        );
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "CRON_SECRET no está configurado.",
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+
+      const authorization =
+        request.headers.get(
+          "authorization"
+        );
+
+      if (
+        authorization !==
+        `Bearer ${cronSecret}`
+      ) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "No autorizado.",
+          },
+          {
+            status: 401,
+          }
+        );
+      }
     }
+
+    /* =====================================================
+       1. SUPABASE
+    ====================================================== */
 
     const supabase =
       createAdminClient();
 
     const today =
-      getAppTodayString();
+      getMexicoCityToday();
 
     /* =====================================================
-       2. BUSCAR ASIGNACIONES PENDIENTES
+       2. ASIGNACIONES PENDIENTES
 
-       Solamente:
-       - status = pending
-       - hoy o futuras
-
-       La ventana exacta de 3 días
-       se valida después.
+       service_date viene de service_plans.
     ====================================================== */
 
     const {
@@ -189,23 +306,24 @@ export async function GET(
         service_teams (
           id,
           team_name,
-          arrival_time
+          arrival_time,
+          service_time
         )
         `
       )
       .eq(
         "status",
         "pending"
-      )
-      .gte(
-        "service_plans.service_date",
-        today
       );
 
     if (error) {
       return NextResponse.json(
         {
           ok: false,
+
+          step:
+            "assignments",
+
           error:
             error.message,
         },
@@ -217,7 +335,7 @@ export async function GET(
 
     const assignments =
       (data ??
-        []) as PendingAssignmentRow[];
+        []) as AssignmentRow[];
 
     /* =====================================================
        3. CONTADORES
@@ -227,20 +345,30 @@ export async function GET(
     let eligible = 0;
     let sent = 0;
     let failed = 0;
-    let skippedAlreadySent = 0;
+
+    let skippedPast = 0;
+    let skippedOutsideWindow =
+      0;
     let skippedNoAccount = 0;
-    let skippedOutsideWindow = 0;
+    let skippedAlreadySent = 0;
+    let skippedNoPlan = 0;
 
     const results: Array<{
       assignmentId: string;
-      profileName: string | null;
-      serviceDate: string | null;
-      daysUntil: number | null;
+      profileName:
+        | string
+        | null;
+      serviceDate:
+        | string
+        | null;
+      daysUntil:
+        | number
+        | null;
       result: string;
     }> = [];
 
     /* =====================================================
-       4. REVISAR CADA ASIGNACIÓN
+       4. REVISAR ASIGNACIONES
     ====================================================== */
 
     for (
@@ -264,7 +392,15 @@ export async function GET(
           assignment.service_teams
         );
 
-      if (!plan) {
+      /* ===================================================
+         PLAN
+      =================================================== */
+
+      if (
+        !plan?.service_date
+      ) {
+        skippedNoPlan++;
+
         results.push({
           assignmentId:
             assignment.id,
@@ -280,7 +416,7 @@ export async function GET(
             null,
 
           result:
-            "Sin plan asociado",
+            "Sin plan o fecha",
         });
 
         continue;
@@ -292,14 +428,25 @@ export async function GET(
         );
 
       /* ===================================================
-         VENTANA
-
-         Avisamos desde 3 días antes
-         hasta el mismo día.
+         SERVICIO PASADO
       =================================================== */
 
       if (
-        daysUntil < 0 ||
+        daysUntil < 0
+      ) {
+        skippedPast++;
+
+        continue;
+      }
+
+      /* ===================================================
+         VENTANA DE PRODUCCIÓN
+
+         Enviamos recordatorios desde
+         3 días antes hasta el mismo día.
+      =================================================== */
+
+      if (
         daysUntil > 3
       ) {
         skippedOutsideWindow++;
@@ -310,7 +457,7 @@ export async function GET(
       eligible++;
 
       /* ===================================================
-         DEBE TENER CUENTA AUTH
+         CUENTA VINCULADA
       =================================================== */
 
       if (
@@ -332,17 +479,14 @@ export async function GET(
           daysUntil,
 
           result:
-            "Perfil sin cuenta vinculada",
+            "Sin cuenta Auth vinculada",
         });
 
         continue;
       }
 
       /* ===================================================
-         DEDUPE
-
-         Una notificación por asignación
-         para esta ventana de confirmación.
+         EVITAR DUPLICADOS
       =================================================== */
 
       const dedupeKey =
@@ -350,7 +494,8 @@ export async function GET(
 
       const {
         data: existingLog,
-        error: logCheckError,
+        error:
+          existingLogError,
       } = await supabase
         .from(
           "push_delivery_log"
@@ -362,19 +507,48 @@ export async function GET(
         )
         .maybeSingle();
 
-      if (logCheckError) {
-        console.error(
-          "No se pudo revisar push_delivery_log:",
-          logCheckError
-        );
-
+      if (
+        existingLogError
+      ) {
         failed++;
+
+        results.push({
+          assignmentId:
+            assignment.id,
+
+          profileName:
+            profile.full_name,
+
+          serviceDate:
+            plan.service_date,
+
+          daysUntil,
+
+          result:
+            `Error revisando log: ${existingLogError.message}`,
+        });
 
         continue;
       }
 
       if (existingLog) {
         skippedAlreadySent++;
+
+        results.push({
+          assignmentId:
+            assignment.id,
+
+          profileName:
+            profile.full_name,
+
+          serviceDate:
+            plan.service_date,
+
+          daysUntil,
+
+          result:
+            "Recordatorio ya enviado",
+        });
 
         continue;
       }
@@ -383,49 +557,63 @@ export async function GET(
          MENSAJE
       =================================================== */
 
-      const name =
-        profile.full_name ||
+      const firstName =
+        profile.full_name
+          ?.trim()
+          .split(/\s+/)[0] ||
         "Hola";
 
       const teamName =
         team?.team_name ||
         "tu equipo";
 
-      const formattedDate =
-        formatAppDate(
-          plan.service_date,
-          {
-            weekday:
-              "long",
-
-            day:
-              "numeric",
-
-            month:
-              "long",
-          }
+      const dateText =
+        formatServiceDate(
+          plan.service_date
         );
 
       let title =
         "⏰ Tu servicio está próximo";
 
       let body =
-        `${name}, aún no has confirmado tu asistencia para ${teamName} el ${formattedDate}. Entra a Comunidad VID para confirmar o solicitar un cambio.`;
+        `${firstName}, aún no has confirmado tu asistencia para ${teamName} el ${dateText}.`;
 
-      /*
-       * El mismo día hacemos el mensaje
-       * un poco más urgente.
-       */
-      if (daysUntil === 0) {
+      if (
+        team?.arrival_time
+      ) {
+        body +=
+          ` Llegada: ${team.arrival_time}.`;
+      }
+
+      body +=
+        " Entra a Comunidad VID para confirmar o solicitar un cambio.";
+
+      /* ===================================================
+         MENSAJE ESPECIAL EL MISMO DÍA
+      =================================================== */
+
+      if (
+        daysUntil === 0
+      ) {
         title =
           "🙌 Hoy tienes servicio";
 
         body =
-          `${name}, hoy estás asignado a ${teamName} y tu asistencia sigue pendiente de confirmar. Revisa tu servicio en Comunidad VID.`;
+          `${firstName}, hoy estás asignado a ${teamName} y tu asistencia sigue pendiente de confirmar.`;
+
+        if (
+          team?.arrival_time
+        ) {
+          body +=
+            ` Llegada: ${team.arrival_time}.`;
+        }
+
+        body +=
+          " Revisa tu servicio en Comunidad VID.";
       }
 
       /* ===================================================
-         ENVIAR
+         ENVIAR PUSH
       =================================================== */
 
       try {
@@ -463,15 +651,15 @@ export async function GET(
           pushResult.failed;
 
         /* =================================================
-           SOLO MARCAMOS COMO ENVIADO
-           SI AL MENOS UN DISPOSITIVO LO RECIBIÓ
+           SOLO REGISTRAR SI REALMENTE SE ENVIÓ
         ================================================= */
 
         if (
           pushResult.sent > 0
         ) {
           const {
-            error: insertLogError,
+            error:
+              insertLogError,
           } = await supabase
             .from(
               "push_delivery_log"
@@ -493,8 +681,14 @@ export async function GET(
                 profile_name:
                   profile.full_name,
 
+                auth_user_id:
+                  profile.auth_user_id,
+
                 service_plan_id:
                   assignment.service_plan_id,
+
+                service_date:
+                  plan.service_date,
 
                 team_id:
                   assignment.team_id,
@@ -503,8 +697,14 @@ export async function GET(
                   team?.team_name ??
                   null,
 
-                service_date:
-                  plan.service_date,
+                arrival_time:
+                  team?.arrival_time ??
+                  null,
+
+                service_time:
+                  team?.service_time ??
+                  plan.service_time ??
+                  null,
 
                 days_until:
                   daysUntil,
@@ -521,7 +721,7 @@ export async function GET(
             insertLogError
           ) {
             console.error(
-              "No se pudo registrar push_delivery_log:",
+              "No se pudo guardar push_delivery_log:",
               insertLogError
             );
           }
@@ -555,14 +755,14 @@ export async function GET(
             daysUntil,
 
             result:
-              "No hay dispositivo Push disponible",
+              "No hay dispositivo Push activo",
           });
         }
       } catch (pushError) {
         failed++;
 
         console.error(
-          "Error enviando recordatorio de servicio:",
+          "ERROR RECORDATORIO SERVICIO:",
           pushError
         );
 
@@ -579,17 +779,23 @@ export async function GET(
           daysUntil,
 
           result:
-            "Error de envío",
+            pushError instanceof
+            Error
+              ? pushError.message
+              : "Error enviando Push",
         });
       }
     }
 
     /* =====================================================
-       5. RESPUESTA
+       5. RESULTADO
     ====================================================== */
 
     return NextResponse.json({
       ok: true,
+
+      mode:
+        "PRODUCTION_3_DAYS",
 
       today,
 
@@ -602,14 +808,20 @@ export async function GET(
       failed,
 
       skipped: {
-        alreadySent:
-          skippedAlreadySent,
-
-        noLinkedAccount:
-          skippedNoAccount,
+        past:
+          skippedPast,
 
         outsideWindow:
           skippedOutsideWindow,
+
+        noPlan:
+          skippedNoPlan,
+
+        noAccount:
+          skippedNoAccount,
+
+        alreadySent:
+          skippedAlreadySent,
       },
 
       results,

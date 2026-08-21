@@ -1,83 +1,156 @@
 import { prayerSchedule } from "@/data/prayer-schedule";
 
-export function getMexicoCityNow() {
-  return new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" })
-  );
-}
+import {
+  formatAppDate,
+  getAppCurrentMinutes,
+  getAppTodayString,
+  getDaysUntil,
+} from "@/lib/date-time";
 
-export function parsePrayerDate(dateStr: string) {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day, 20, 0, 0, 0);
-}
+/* =========================================================
+   HORARIO DE ORACIÓN
+========================================================= */
+
+const PRAYER_START_MINUTES = 20 * 60; // 8:00 PM
+const PRAYER_END_MINUTES = 21 * 60; // 9:00 PM
+
+/* =========================================================
+   FORMATEAR FECHA
+========================================================= */
 
 export function formatPrayerDate(dateStr: string) {
-  const date = parsePrayerDate(dateStr);
-
-  return date.toLocaleDateString("es-MX", {
+  return formatAppDate(dateStr, {
     weekday: "long",
     day: "numeric",
     month: "long",
-    timeZone: "America/Mexico_City",
   });
 }
 
-export function getUpcomingPrayerSchedule() {
-  const now = getMexicoCityNow();
+/* =========================================================
+   ¿LA ORACIÓN TODAVÍA DEBE APARECER?
+========================================================= */
 
+function isPrayerStillUpcoming(dateStr: string) {
+  const daysAway = getDaysUntil(dateStr);
+
+  /*
+   * Fecha futura.
+   */
+  if (daysAway > 0) {
+    return true;
+  }
+
+  /*
+   * Fecha pasada.
+   */
+  if (daysAway < 0) {
+    return false;
+  }
+
+  /*
+   * Es hoy:
+   * seguimos mostrándola hasta las 9:00 PM.
+   */
+  return getAppCurrentMinutes() < PRAYER_END_MINUTES;
+}
+
+/* =========================================================
+   ORACIONES PRÓXIMAS
+========================================================= */
+
+export function getUpcomingPrayerSchedule() {
   return prayerSchedule
-    .filter((item) => {
-      const end = parsePrayerDate(item.date);
-      end.setHours(21, 0, 0, 0);
-      return end.getTime() > now.getTime();
-    })
-    .sort(
-      (a, b) =>
-        parsePrayerDate(a.date).getTime() - parsePrayerDate(b.date).getTime()
+    .filter((item) =>
+      isPrayerStillUpcoming(item.date)
+    )
+    .sort((a, b) =>
+      a.date.localeCompare(b.date)
     );
 }
+
+/* =========================================================
+   PRÓXIMA ORACIÓN
+========================================================= */
 
 export function getNextPrayerScheduleItem() {
   return getUpcomingPrayerSchedule()[0];
 }
 
+/* =========================================================
+   ¿GOOGLE MEET ESTÁ ABIERTO?
+========================================================= */
+
 export function isPrayerMeetOpen(dateStr: string) {
-  const now = getMexicoCityNow();
-  const start = parsePrayerDate(dateStr);
-  const end = new Date(start);
-  end.setHours(21, 0, 0, 0);
+  const today = getAppTodayString();
 
-  return now >= start && now < end;
-}
+  if (dateStr !== today) {
+    return false;
+  }
 
-export function getGroupedPrayerSchedule() {
-  return getUpcomingPrayerSchedule().reduce<Record<string, typeof prayerSchedule>>(
-    (groups, item) => {
-      const date = parsePrayerDate(item.date);
+  const currentMinutes =
+    getAppCurrentMinutes();
 
-      const month = date.toLocaleDateString("es-MX", {
-        month: "long",
-        timeZone: "America/Mexico_City",
-      });
-
-      const key = month.charAt(0).toUpperCase() + month.slice(1);
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
-
-      return groups;
-    },
-    {}
+  return (
+    currentMinutes >=
+      PRAYER_START_MINUTES &&
+    currentMinutes <
+      PRAYER_END_MINUTES
   );
 }
 
-export function getPrayerStatusLabel(status: string) {
-  if (status === "confirmed") return "Confirmado";
-  if (status === "unavailable") return "No podrá asistir";
+/* =========================================================
+   AGRUPAR POR MES
+========================================================= */
+
+export function getGroupedPrayerSchedule() {
+  return getUpcomingPrayerSchedule().reduce<
+    Record<
+      string,
+      typeof prayerSchedule
+    >
+  >((groups, item) => {
+    const month = formatAppDate(
+      item.date,
+      {
+        month: "long",
+      }
+    );
+
+    const key =
+      month.charAt(0).toUpperCase() +
+      month.slice(1);
+
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+
+    groups[key].push(item);
+
+    return groups;
+  }, {});
+}
+
+/* =========================================================
+   ESTADOS
+========================================================= */
+
+export function getPrayerStatusLabel(
+  status: string
+) {
+  if (status === "confirmed") {
+    return "Confirmado";
+  }
+
+  if (status === "unavailable") {
+    return "No podrá asistir";
+  }
+
   return "Por confirmar";
 }
 
-export function getPrayerStatusClasses(status: string) {
+export function getPrayerStatusClasses(
+  status: string
+) {
   if (status === "confirmed") {
     return "bg-emerald-100 text-emerald-700 border-emerald-200";
   }

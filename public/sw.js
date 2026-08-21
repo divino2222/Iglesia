@@ -13,8 +13,11 @@ self.addEventListener("push", (event) => {
     title: "Comunidad VID",
     body: "Tienes una nueva notificación.",
     url: "/",
-    icon: "/icons/icon-192x192.png",
-    badge: "/icons/icon-192x192.png",
+    icon:
+  "/icons/icon-192.png",
+
+badge:
+  "/icons/icon-192.png",
     tag: "comunidad-vid",
   };
 

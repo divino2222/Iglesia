@@ -1,201 +1,137 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-
+import { Eye, EyeOff, LockKeyhole, LogIn, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-type Props = {
-  errorMessage?: string;
-};
-
-type DefaultRouteResponse = {
-  route?: string;
-  error?: string;
-};
-
-export function LoginForm({
-  errorMessage,
-}: Props) {
+export default function LoginForm() {
   const router = useRouter();
 
-  const [email, setEmail] =
-    useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const [password, setPassword] =
-    useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [loading, setLoading] =
-    useState(false);
-
-  const [localError, setLocalError] =
-    useState("");
-
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setLoading(true);
-    setLocalError("");
+    setErrorMessage("");
 
-    try {
-      const supabase =
-        createClient();
+    const supabase = createClient();
 
-      const {
-        error: signInError,
-      } =
-        await supabase.auth.signInWithPassword(
-          {
-            email: email
-              .trim()
-              .toLowerCase(),
-            password,
-          }
-        );
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-      if (signInError) {
-        setLocalError(
-          signInError.message
+    if (error) {
+      setLoading(false);
+
+      if (error.message.toLowerCase().includes("invalid login")) {
+        setErrorMessage("Correo o contraseña incorrectos.");
+        return;
+      }
+
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setErrorMessage(
+          "Primero confirma tu correo electrónico para poder ingresar."
         );
         return;
       }
 
-      /*
-       * La sesión ya quedó guardada en las cookies.
-       * Ahora preguntamos al servidor cuál es la ruta
-       * correspondiente al rol y permisos de la persona.
-       */
-      const response = await fetch(
-        "/api/auth/default-route",
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            Accept:
-              "application/json",
-          },
-        }
-      );
-
-      const result =
-        (await response.json()) as DefaultRouteResponse;
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            "No se pudo determinar tu página de inicio."
-        );
-      }
-
-      const destination =
-        result.route ||
-        "/mi-servicio";
-
-      router.replace(destination);
-      router.refresh();
-    } catch (error) {
-      setLocalError(
-        error instanceof Error
-          ? error.message
-          : "No se pudo iniciar sesión."
-      );
-    } finally {
-      setLoading(false);
+      setErrorMessage(error.message);
+      return;
     }
+
+    router.replace("/mi-cuenta");
+    router.refresh();
   }
 
   return (
-    <section className="w-full rounded-[34px] border border-stone-200 bg-white p-7 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">
-        Comunidad VID
-      </p>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <label className="block">
+        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+          Correo electrónico
+        </span>
 
-      <h1 className="mt-2 text-4xl font-semibold text-stone-950">
-        Iniciar sesión
-      </h1>
-
-      <p className="mt-2 text-sm leading-6 text-stone-600">
-        Entra para acceder a las
-        funciones disponibles para tu
-        cuenta.
-      </p>
-
-      {errorMessage ||
-      localError ? (
-        <div
-          role="alert"
-          className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-        >
-          {localError ||
-            errorMessage}
-        </div>
-      ) : null}
-
-      <form
-        onSubmit={handleSubmit}
-        className="mt-6 space-y-4"
-      >
-        <label className="block space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-            Correo
-          </span>
+        <div className="flex items-center gap-3 rounded-[20px] border border-stone-200 bg-stone-50 px-4">
+          <Mail size={18} className="text-stone-400" />
 
           <input
             type="email"
-            name="email"
-            autoComplete="email"
-            placeholder="correo@ejemplo.com"
             required
-            disabled={loading}
+            autoComplete="email"
             value={email}
-            onChange={(event) =>
-              setEmail(
-                event.target.value
-              )
-            }
-            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-stone-950 outline-none transition focus:border-emerald-500 disabled:cursor-not-allowed disabled:bg-stone-100"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="tu@correo.com"
+            className="min-w-0 flex-1 bg-transparent py-4 text-sm text-stone-950 outline-none"
           />
-        </label>
+        </div>
+      </label>
 
-        <label className="block space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-            Contraseña
-          </span>
+      <label className="block">
+        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+          Contraseña
+        </span>
+
+        <div className="flex items-center gap-3 rounded-[20px] border border-stone-200 bg-stone-50 px-4">
+          <LockKeyhole size={18} className="text-stone-400" />
 
           <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            placeholder="Tu contraseña"
+            type={showPassword ? "text" : "password"}
             required
-            disabled={loading}
+            autoComplete="current-password"
             value={password}
-            onChange={(event) =>
-              setPassword(
-                event.target.value
-              )
-            }
-            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-stone-950 outline-none transition focus:border-emerald-500 disabled:cursor-not-allowed disabled:bg-stone-100"
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Tu contraseña"
+            className="min-w-0 flex-1 bg-transparent py-4 text-sm text-stone-950 outline-none"
           />
-        </label>
 
-        <button
-          type="submit"
-          disabled={
-            loading ||
-            !email.trim() ||
-            !password
-          }
-          className="w-full rounded-2xl bg-stone-950 px-4 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading
-            ? "Entrando..."
-            : "Entrar"}
-        </button>
-      </form>
-    </section>
+          <button
+            type="button"
+            onClick={() => setShowPassword((value) => !value)}
+            className="text-stone-400"
+            aria-label={
+              showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+            }
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
+      </label>
+
+      {errorMessage ? (
+        <div className="rounded-[18px] border border-red-100 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="flex w-full items-center justify-center gap-2 rounded-[22px] bg-stone-950 px-5 py-4 text-sm font-semibold text-white shadow-[0_12px_25px_rgba(0,0,0,0.15)] transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <LogIn size={18} />
+
+        {loading ? "Ingresando..." : "Iniciar sesión"}
+      </button>
+
+      <div className="text-center">
+        <p className="text-sm text-stone-600">
+          ¿Todavía no tienes cuenta?{" "}
+          <Link
+            href="/registro"
+            className="font-semibold text-stone-950 underline underline-offset-4"
+          >
+            Crear cuenta
+          </Link>
+        </p>
+      </div>
+    </form>
   );
 }

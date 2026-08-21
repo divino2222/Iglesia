@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Clock3,
   MapPin,
+  MessageCircle,
   MonitorPlay,
   Trophy,
 } from "lucide-react";
@@ -11,6 +12,17 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getChurchInfo } from "@/lib/church-info";
 import { churchMedia } from "@/lib/church-media";
+
+import {
+  formatAppCardDate,
+  formatAppDate,
+  getNextWeeklyOccurrence,
+  isAppTodayOrFuture,
+} from "@/lib/date-time";
+
+/* =========================================================
+   TIPOS
+========================================================= */
 
 type EventRow = {
   id: number;
@@ -32,113 +44,34 @@ type RegularHomeEvent = {
   title: string;
   description: string;
   location: string;
-  date: Date;
+
+  /*
+   * Ahora usamos YYYY-MM-DD,
+   * no Date del servidor.
+   */
+  date: string;
+
   displayDate: {
     weekday: string;
     day: string;
   };
+
   displayTime: string;
+
   badge: string;
+
   badgeClass: string;
-  modeIcon: "online" | "location";
+
+  modeIcon:
+    | "online"
+    | "location";
+
+  whatsappMessage: string;
 };
 
-function getMexicoCityNow() {
-  return new Date(
-    new Date().toLocaleString("en-US", {
-      timeZone: "America/Mexico_City",
-    })
-  );
-}
-
-function parseLocalDate(
-  dateStr: string
-) {
-  const [year, month, day] =
-    dateStr
-      .split("-")
-      .map(Number);
-
-  return new Date(
-    year,
-    month - 1,
-    day,
-    0,
-    0,
-    0,
-    0
-  );
-}
-
-function getNextOccurrence(
-  targetWeekday: number,
-  baseDate: Date,
-  eventHour = 0,
-  eventMinute = 0
-) {
-  const result =
-    new Date(baseDate);
-
-  const currentWeekday =
-    result.getDay();
-
-  let diff =
-    targetWeekday -
-    currentWeekday;
-
-  if (diff < 0) {
-    diff += 7;
-  }
-
-  result.setDate(
-    result.getDate() + diff
-  );
-
-  result.setHours(
-    eventHour,
-    eventMinute,
-    0,
-    0
-  );
-
-  if (
-    result.getTime() <
-    baseDate.getTime()
-  ) {
-    result.setDate(
-      result.getDate() + 7
-    );
-  }
-
-  return result;
-}
-
-function formatCardDate(
-  date: Date
-) {
-  return {
-    weekday:
-      date.toLocaleDateString(
-        "es-MX",
-        {
-          weekday: "short",
-          timeZone:
-            "America/Mexico_City",
-        }
-      ),
-
-    day:
-      date.toLocaleDateString(
-        "es-MX",
-        {
-          day: "numeric",
-          month: "short",
-          timeZone:
-            "America/Mexico_City",
-        }
-      ),
-  };
-}
+/* =========================================================
+   FECHA EVENTO ESPECIAL
+========================================================= */
 
 function formatSpecialDate(
   date: string | null
@@ -147,10 +80,8 @@ function formatSpecialDate(
     return "Fecha por confirmar";
   }
 
-  return parseLocalDate(
-    date
-  ).toLocaleDateString(
-    "es-MX",
+  return formatAppDate(
+    date,
     {
       weekday: "long",
       day: "numeric",
@@ -158,6 +89,10 @@ function formatSpecialDate(
     }
   );
 }
+
+/* =========================================================
+   HORA EVENTO ESPECIAL
+========================================================= */
 
 function formatSpecialTime(
   time: string | null
@@ -168,6 +103,10 @@ function formatSpecialTime(
 
   return time;
 }
+
+/* =========================================================
+   IMAGEN EVENTO ESPECIAL
+========================================================= */
 
 function getSpecialImage(
   event: EventRow,
@@ -195,15 +134,29 @@ function getSpecialImage(
   );
 }
 
+/* =========================================================
+   WHATSAPP
+========================================================= */
+
+function buildWhatsAppUrl(
+  whatsappNumber: string,
+  message: string
+) {
+  return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+    message
+  )}`;
+}
+
+/* =========================================================
+   COMPONENTE
+========================================================= */
+
 export default async function EventsSection() {
   const supabase =
     await createClient();
 
   const churchInfo =
     await getChurchInfo();
-
-  const now =
-    getMexicoCityNow();
 
   const serviceAddress =
     churchInfo?.address ??
@@ -213,129 +166,206 @@ export default async function EventsSection() {
     churchInfo?.whatsapp_number?.trim() ||
     "525520035631";
 
-  const sundayDate =
-    getNextOccurrence(
-      0,
-      now,
-      11,
-      0
-    );
-
-  const tuesdayPrayerDate =
-    getNextOccurrence(
-      2,
-      now,
-      20,
-      0
-    );
-
-  const thursdayPrayerDate =
-    getNextOccurrence(
-      4,
-      now,
-      20,
-      0
-    );
+  /* =========================================================
+     EVENTOS RECURRENTES
+  ========================================================= */
 
   /*
-   * Primero declaramos el arreglo
-   * explícitamente como RegularHomeEvent[].
+   * Domingo 11:00 AM.
    *
-   * Así TypeScript conserva los literales
-   * "location" y "online" correctamente.
+   * Si hoy es domingo pero ya pasaron
+   * las 11:00 AM, devuelve el siguiente.
    */
+  const sundayDate =
+    getNextWeeklyOccurrence({
+      weekday: 0,
+      hour: 11,
+      minute: 0,
+    });
+
+  /*
+   * Martes 8:00 PM.
+   */
+  const tuesdayPrayerDate =
+    getNextWeeklyOccurrence({
+      weekday: 2,
+      hour: 20,
+      minute: 0,
+    });
+
+  /*
+   * Jueves 8:00 PM.
+   */
+  const thursdayPrayerDate =
+    getNextWeeklyOccurrence({
+      weekday: 4,
+      hour: 20,
+      minute: 0,
+    });
+
   const regularEvents:
     RegularHomeEvent[] = [
-    {
-      id: "regular-sunday",
-      title:
-        "Servicio dominical",
-      description:
-        "Nuestra reunión principal de adoración, enseñanza bíblica y comunidad.",
-      location:
-        serviceAddress,
-      date: sundayDate,
-      displayDate:
-        formatCardDate(
-          sundayDate
-        ),
-      displayTime:
-        "Domingos · 11:00 AM · Presencial",
-      badge: "Servicio",
-      badgeClass:
-        "bg-blue-100 text-blue-700",
-      modeIcon:
-        "location",
-    },
-    {
-      id: "regular-tuesday-prayer",
-      title:
-        "Noche de oración",
-      description:
-        "Un tiempo especial para buscar a Dios juntos como iglesia.",
-      location: "En línea",
-      date:
-        tuesdayPrayerDate,
-      displayDate:
-        formatCardDate(
-          tuesdayPrayerDate
-        ),
-      displayTime:
-        "Martes · 8:00 PM a 9:00 PM · En línea",
-      badge: "Oración",
-      badgeClass:
-        "bg-emerald-100 text-emerald-700",
-      modeIcon:
-        "online",
-    },
-    {
-      id: "regular-thursday-prayer",
-      title:
-        "Noche de oración",
-      description:
-        "Un tiempo especial para buscar a Dios juntos como iglesia.",
-      location: "En línea",
-      date:
-        thursdayPrayerDate,
-      displayDate:
-        formatCardDate(
-          thursdayPrayerDate
-        ),
-      displayTime:
-        "Jueves · 8:00 PM a 9:00 PM · En línea",
-      badge: "Oración",
-      badgeClass:
-        "bg-emerald-100 text-emerald-700",
-      modeIcon:
-        "online",
-    },
-  ];
+      {
+        id:
+          "regular-sunday",
 
+        title:
+          "Servicio dominical",
+
+        description:
+          "Nuestra reunión principal de adoración, enseñanza bíblica y comunidad.",
+
+        location:
+          serviceAddress,
+
+        date:
+          sundayDate,
+
+        displayDate:
+          formatAppCardDate(
+            sundayDate
+          ),
+
+        displayTime:
+          "Domingos · 11:00 AM · Presencial",
+
+        badge:
+          "Servicio",
+
+        badgeClass:
+          "bg-blue-100 text-blue-700",
+
+        modeIcon:
+          "location",
+
+        whatsappMessage:
+          "Hola, quiero información para asistir al servicio dominical de Comunidad VID.",
+      },
+
+      {
+        id:
+          "regular-tuesday-prayer",
+
+        title:
+          "Noche de oración",
+
+        description:
+          "Un tiempo especial para buscar a Dios juntos como iglesia.",
+
+        location:
+          "En línea",
+
+        date:
+          tuesdayPrayerDate,
+
+        displayDate:
+          formatAppCardDate(
+            tuesdayPrayerDate
+          ),
+
+        displayTime:
+          "Martes · 8:00 PM a 9:00 PM · En línea",
+
+        badge:
+          "Oración",
+
+        badgeClass:
+          "bg-emerald-100 text-emerald-700",
+
+        modeIcon:
+          "online",
+
+        whatsappMessage:
+          "Hola, quiero información sobre la oración en línea de Comunidad VID.",
+      },
+
+      {
+        id:
+          "regular-thursday-prayer",
+
+        title:
+          "Noche de oración",
+
+        description:
+          "Un tiempo especial para buscar a Dios juntos como iglesia.",
+
+        location:
+          "En línea",
+
+        date:
+          thursdayPrayerDate,
+
+        displayDate:
+          formatAppCardDate(
+            thursdayPrayerDate
+          ),
+
+        displayTime:
+          "Jueves · 8:00 PM a 9:00 PM · En línea",
+
+        badge:
+          "Oración",
+
+        badgeClass:
+          "bg-emerald-100 text-emerald-700",
+
+        modeIcon:
+          "online",
+
+        whatsappMessage:
+          "Hola, quiero información sobre la oración en línea de Comunidad VID.",
+      },
+    ];
+
+  /*
+   * Como YYYY-MM-DD ordena
+   * cronológicamente por texto,
+   * no necesitamos Date.
+   */
   regularEvents.sort(
     (a, b) =>
-      a.date.getTime() -
-      b.date.getTime()
+      a.date.localeCompare(
+        b.date
+      )
   );
 
   const nextRegularEvent =
     regularEvents[0] ??
     null;
 
-  const { data } =
-    await supabase
-      .from("events")
-      .select("*")
-      .order(
-        "event_date",
-        {
-          ascending: true,
-        }
-      );
+  /* =========================================================
+     EVENTOS ESPECIALES DESDE SUPABASE
+  ========================================================= */
 
+  const {
+    data,
+    error: eventsError,
+  } = await supabase
+    .from("events")
+    .select("*")
+    .order(
+      "event_date",
+      {
+        ascending: true,
+      }
+    );
+
+  /*
+   * Si Supabase falla,
+   * seguimos mostrando los
+   * eventos recurrentes.
+   */
+  const specialRows =
+    eventsError
+      ? []
+      : ((data ?? []) as EventRow[]);
+
+  /*
+   * Liderazgo sigue fuera,
+   * como habíamos acordado.
+   */
   const rawSpecialEvents =
-    (
-      (data ?? []) as EventRow[]
-    ).filter(
+    specialRows.filter(
       (event) =>
         !event.title
           .toLowerCase()
@@ -344,56 +374,39 @@ export default async function EventsSection() {
           )
     );
 
+  /* =========================================================
+     EVENTOS CON FECHA
+  ========================================================= */
+
   const datedSpecialEvents =
     rawSpecialEvents
       .filter(
         (event) =>
-          event.event_date
-      )
-      .filter((event) => {
-        if (
-          !event.event_date
-        ) {
-          return false;
-        }
-
-        const eventDate =
-          parseLocalDate(
+          Boolean(
             event.event_date
-          );
-
-        eventDate.setHours(
-          23,
-          59,
-          59,
-          999
-        );
-
-        return (
-          eventDate >= now
-        );
-      })
-      .sort(
-        (
-          a,
-          b
-        ) => {
-          const dateA =
-            parseLocalDate(
-              a.event_date as string
-            ).getTime();
-
-          const dateB =
-            parseLocalDate(
-              b.event_date as string
-            ).getTime();
-
-          return (
-            dateA -
-            dateB
-          );
-        }
+          )
+      )
+      .filter(
+        (event) =>
+          event.event_date
+            ? isAppTodayOrFuture(
+                event.event_date
+              )
+            : false
+      )
+      .sort((a, b) =>
+        String(
+          a.event_date
+        ).localeCompare(
+          String(
+            b.event_date
+          )
+        )
       );
+
+  /* =========================================================
+     EVENTOS SIN FECHA
+  ========================================================= */
 
   const undatedSpecialEvents =
     rawSpecialEvents.filter(
@@ -401,17 +414,26 @@ export default async function EventsSection() {
         !event.event_date
     );
 
+  /*
+   * Home:
+   * máximo 3 especiales.
+   */
   const homeSpecialEvents =
     [
       ...datedSpecialEvents.slice(
         0,
         2
       ),
+
       ...undatedSpecialEvents,
     ].slice(
       0,
       3
     );
+
+  /* =========================================================
+     RENDER
+  ========================================================= */
 
   return (
     <div className="space-y-4">
@@ -433,6 +455,10 @@ export default async function EventsSection() {
       </div>
 
       <div className="space-y-4">
+        {/* ===================================================
+            PRÓXIMO EVENTO RECURRENTE
+        =================================================== */}
+
         {nextRegularEvent ? (
           <div className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_14px_30px_rgba(0,0,0,0.06)] transition-all duration-300 hover:shadow-xl">
             <div className="bg-gradient-to-r from-stone-950 via-stone-900 to-stone-800 p-4 text-white">
@@ -503,16 +529,12 @@ export default async function EventsSection() {
                       {nextRegularEvent.modeIcon ===
                       "online" ? (
                         <MonitorPlay
-                          size={
-                            15
-                          }
+                          size={15}
                           className="text-stone-400"
                         />
                       ) : (
                         <MapPin
-                          size={
-                            15
-                          }
+                          size={15}
                           className="text-stone-400"
                         />
                       )}
@@ -533,18 +555,23 @@ export default async function EventsSection() {
                     </p>
                   </div>
 
+                  {/* CTA WHATSAPP */}
+
                   <div className="mt-4">
                     <Link
-                      href="/eventos"
+                      href={buildWhatsAppUrl(
+                        whatsappNumber,
+                        nextRegularEvent.whatsappMessage
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
                       className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
                     >
-                      Ver detalle
-
-                      <ChevronRight
-                        size={
-                          16
-                        }
+                      <MessageCircle
+                        size={16}
                       />
+
+                      Solicitar información
                     </Link>
                   </div>
                 </div>
@@ -552,6 +579,10 @@ export default async function EventsSection() {
             </div>
           </div>
         ) : null}
+
+        {/* ===================================================
+            EVENTOS ESPECIALES
+        =================================================== */}
 
         {homeSpecialEvents.map(
           (
@@ -561,11 +592,28 @@ export default async function EventsSection() {
             const isUndated =
               !event.event_date;
 
-            const registerUrl =
-              event.cta_url ||
-              `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-                `Hola, quiero registrarme al evento "${event.title}" de Comunidad VID.`
-              )}`;
+            /*
+             * Si Supabase ya tiene un CTA,
+             * lo respetamos.
+             *
+             * Si no tiene, WhatsApp.
+             */
+            const contactUrl =
+              event.cta_url?.trim() ||
+              buildWhatsAppUrl(
+                whatsappNumber,
+                `Hola, quiero solicitar información sobre el evento "${event.title}" de Comunidad VID.`
+              );
+
+            /*
+             * Si pusiste un texto específico
+             * como "Regístrate", lo conservamos.
+             *
+             * Si no, mostramos el nuevo CTA.
+             */
+            const contactLabel =
+              event.cta_label?.trim() ||
+              "Solicitar información";
 
             return (
               <div
@@ -600,17 +648,13 @@ export default async function EventsSection() {
                   </div>
 
                   <h4 className="text-lg font-semibold text-stone-900">
-                    {
-                      event.title
-                    }
+                    {event.title}
                   </h4>
 
                   <div className="mt-3 space-y-2 text-sm text-stone-600">
                     <div className="flex items-center gap-2">
                       <CalendarDays
-                        size={
-                          15
-                        }
+                        size={15}
                         className="text-stone-400"
                       />
 
@@ -623,9 +667,7 @@ export default async function EventsSection() {
 
                     <div className="flex items-center gap-2">
                       <Clock3
-                        size={
-                          15
-                        }
+                        size={15}
                         className="text-stone-400"
                       />
 
@@ -638,9 +680,7 @@ export default async function EventsSection() {
 
                     <div className="flex items-center gap-2">
                       <Trophy
-                        size={
-                          15
-                        }
+                        size={15}
                         className="text-stone-400"
                       />
 
@@ -659,24 +699,24 @@ export default async function EventsSection() {
                     </p>
                   ) : null}
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                      href="/eventos"
-                      className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
-                    >
-                      Ver detalle
-                    </Link>
+                  {/* UN SOLO CTA */}
 
+                  <div className="mt-4">
                     <Link
                       href={
-                        registerUrl
+                        contactUrl
                       }
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
                     >
-                      {event.cta_label ||
-                        "Regístrate"}
+                      <MessageCircle
+                        size={16}
+                      />
+
+                      {
+                        contactLabel
+                      }
                     </Link>
                   </div>
                 </div>

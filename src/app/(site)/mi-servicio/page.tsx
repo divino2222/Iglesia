@@ -1,338 +1,695 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   CalendarDays,
+  CheckCircle2,
   Clock3,
-  MapPin,
-  Users,
+  MessageCircle,
+  ShieldCheck,
+  UsersRound,
 } from "lucide-react";
 
 import {
-  requirePermission,
-} from "@/lib/auth/permissions";
-import { createAdminClient } from "@/lib/supabase/admin";
+  formatAppDateLong,
+  getAppTodayString,
+} from "@/lib/date-time";
 
-import AssignmentResponse from "./assignment-response";
+import { createClient } from "@/lib/supabase/server";
+import PersonalChecklistItem from "@/components/serving/personal-checklist-item";
 
-type AssignmentRow = {
-  id: string;
-  status: string;
-  note: string | null;
-  service_plans:
-    | {
-        id: string;
-        title: string;
-        service_date: string;
-        service_time: string | null;
-        location: string | null;
-      }
-    | {
-        id: string;
-        title: string;
-        service_date: string;
-        service_time: string | null;
-        location: string | null;
-      }[]
-    | null;
-  service_teams:
-    | {
-        id: string;
-        team_name: string;
-        emoji: string | null;
-        arrival_time: string | null;
-        service_time: string | null;
-      }
-    | {
-        id: string;
-        team_name: string;
-        emoji: string | null;
-        arrival_time: string | null;
-        service_time: string | null;
-      }[]
-    | null;
-};
+type AssignmentStatus =
+  | "pending"
+  | "confirmed"
+  | "change_requested";
 
-function getSingleRelation<T>(
-  relation: T | T[] | null
-): T | null {
-  if (!relation) {
-    return null;
+/* =========================================================
+   ESTADOS
+========================================================= */
+
+function getStatusLabel(status: AssignmentStatus) {
+  if (status === "confirmed") {
+    return "Asistencia confirmada";
   }
 
-  if (Array.isArray(relation)) {
-    return relation[0] ?? null;
+  if (status === "change_requested") {
+    return "Cambio solicitado";
   }
 
-  return relation;
+  return "Pendiente de confirmar";
 }
 
-function formatDate(date: string) {
-  const [year, month, day] = date
-    .split("-")
-    .map(Number);
+function getStatusClasses(status: AssignmentStatus) {
+  if (status === "confirmed") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
 
-  return new Date(
-    year,
-    month - 1,
-    day
-  ).toLocaleDateString("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  if (status === "change_requested") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+
+  return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
-export default async function MyServicePage() {
-  const access =
-    await requirePermission(
-      "own_assignments.view",
-      {
-        redirectTo: "/sin-acceso",
-      }
-    );
+/* =========================================================
+   FECHAS
+========================================================= */
 
-  const admin =
-    createAdminClient();
 
-  const today = new Date()
-    .toISOString()
-    .slice(0, 10);
+
+
+/* =========================================================
+   PÁGINA
+========================================================= */
+
+export default async function MiServicioPage() {
+  const supabase = await createClient();
+
+  /* =========================================================
+     USUARIO
+  ========================================================= */
 
   const {
-    data,
-    error,
-  } = await admin
-    .from("service_assignments")
-    .select(`
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/login");
+  }
+
+  /* =========================================================
+     PERFIL
+  ========================================================= */
+
+  const {
+    data: profile,
+    error: profileError,
+  } = await supabase
+    .from("profiles")
+    .select(
+      `
+      id,
+      full_name,
+      phone,
+      photo_url,
+      ministries,
+      auth_user_id,
+      email
+      `
+    )
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(
+      `No se pudo cargar tu perfil: ${profileError.message}`
+    );
+  }
+
+  /* =========================================================
+     SIN PERFIL VINCULADO
+  ========================================================= */
+
+  if (!profile) {
+    return (
+      <div className="space-y-5 px-4 py-6 pb-28">
+        <section className="rounded-[34px] border border-amber-100 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-amber-700">
+              <UsersRound size={22} />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                Mi servicio
+              </p>
+
+              <h1 className="mt-1 text-2xl font-semibold text-stone-950">
+                Tu cuenta todavía no está vinculada
+              </h1>
+
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                Coordinación debe relacionar tu cuenta con tu perfil de
+                servidor antes de mostrar tus asignaciones.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/mi-cuenta"
+            className="mt-5 flex w-full items-center justify-center rounded-[20px] bg-stone-950 px-4 py-3 text-sm font-semibold text-white"
+          >
+            Ver mi cuenta
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
+  /* =========================================================
+     ASIGNACIONES
+  ========================================================= */
+
+  const today = getAppTodayString();
+
+  const {
+    data: assignments,
+    error: assignmentsError,
+  } = await supabase
+    .from("assignments")
+    .select(
+      `
       id,
       status,
       note,
+      service_plan_id,
+      team_id,
+
       service_plans (
         id,
-        title,
         service_date,
+        title,
         service_time,
-        location
+        location,
+        preacher,
+        theme,
+        verse,
+        notes,
+        status
       ),
+
       service_teams (
         id,
         team_name,
         emoji,
+        leader_name,
         arrival_time,
-        service_time
+        service_time,
+        status,
+        members,
+        checklist
       )
-    `)
-    .eq(
-      "profile_id",
-      access.profileId
-    );
+      `
+    )
+    .eq("profile_id", profile.id);
 
-  if (error) {
+  if (assignmentsError) {
     throw new Error(
-      `No se pudo consultar tu servicio: ${error.message}`
+      `No se pudieron cargar tus asignaciones: ${assignmentsError.message}`
     );
   }
 
-  const assignments =
-    ((data ?? []) as AssignmentRow[])
-      .map((assignment) => ({
-        assignment,
-        plan:
-          getSingleRelation(
-            assignment.service_plans
-          ),
-        team:
-          getSingleRelation(
-            assignment.service_teams
-          ),
-      }))
-      .filter(
-        (
-          item
-        ): item is {
-          assignment: AssignmentRow;
-          plan: NonNullable<
-            ReturnType<
-              typeof getSingleRelation<{
-                id: string;
-                title: string;
-                service_date: string;
-                service_time: string | null;
-                location: string | null;
-              }>
-            >
-          >;
-          team: NonNullable<
-            ReturnType<
-              typeof getSingleRelation<{
-                id: string;
-                team_name: string;
-                emoji: string | null;
-                arrival_time: string | null;
-                service_time: string | null;
-              }>
-            >
-          >;
-        } =>
-          Boolean(
-            item.plan &&
-            item.team &&
-            item.plan.service_date >=
-              today
-          )
+  /* =========================================================
+     PRÓXIMA ASIGNACIÓN
+  ========================================================= */
+
+  const futureAssignments = (
+    assignments ?? []
+  )
+    .filter((assignment) => {
+      const plan = Array.isArray(
+        assignment.service_plans
       )
-      .sort((a, b) =>
-        a.plan.service_date.localeCompare(
-          b.plan.service_date
+        ? assignment.service_plans[0]
+        : assignment.service_plans;
+
+      return (
+        plan?.service_date &&
+        plan.service_date >= today
+      );
+    })
+    .sort((a, b) => {
+      const planA = Array.isArray(
+        a.service_plans
+      )
+        ? a.service_plans[0]
+        : a.service_plans;
+
+      const planB = Array.isArray(
+        b.service_plans
+      )
+        ? b.service_plans[0]
+        : b.service_plans;
+
+      return String(
+        planA?.service_date || ""
+      ).localeCompare(
+        String(
+          planB?.service_date || ""
         )
       );
+    });
 
   const nextAssignment =
-    assignments[0] ?? null;
+    futureAssignments[0];
+
+  /* =========================================================
+     SIN ASIGNACIÓN
+  ========================================================= */
+
+  if (!nextAssignment) {
+    return (
+      <div className="space-y-5 px-4 py-6 pb-28">
+        <section className="overflow-hidden rounded-[34px] border border-stone-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
+          <div className="bg-gradient-to-br from-stone-950 via-stone-900 to-stone-800 px-5 py-7 text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/50">
+              Mi servicio
+            </p>
+
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+              Hola, {profile.full_name}
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-white/70">
+              Aquí aparecerán tus próximos servicios en Comunidad VID.
+            </p>
+          </div>
+
+          <div className="p-5">
+            <div className="rounded-[28px] border border-emerald-100 bg-emerald-50 p-5 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-emerald-700">
+                <CheckCircle2 size={25} />
+              </div>
+
+              <h2 className="mt-4 text-xl font-semibold text-stone-950">
+                No tienes una asignación próxima
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                Cuando coordinación te asigne a un próximo servicio,
+                aparecerá automáticamente aquí.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <Link
+          href="/mi-cuenta"
+          className="flex items-center justify-center rounded-[24px] border border-stone-200 bg-white px-5 py-4 text-sm font-semibold text-stone-950 shadow-sm"
+        >
+          Ir a mi cuenta
+        </Link>
+      </div>
+    );
+  }
+
+  /* =========================================================
+     PLAN + EQUIPO
+  ========================================================= */
+
+  const plan = Array.isArray(
+    nextAssignment.service_plans
+  )
+    ? nextAssignment.service_plans[0]
+    : nextAssignment.service_plans;
+
+  const team = Array.isArray(
+    nextAssignment.service_teams
+  )
+    ? nextAssignment.service_teams[0]
+    : nextAssignment.service_teams;
+
+  if (!plan || !team) {
+    throw new Error(
+      "La asignación existe, pero faltan datos del servicio o del equipo."
+    );
+  }
+
+  const status =
+    nextAssignment.status as AssignmentStatus;
+
+  /* =========================================================
+     CHECKLIST PERSONAL DEL SERVIDOR
+  ========================================================= */
+
+  const {
+    data: checklistProgress,
+    error: checklistProgressError,
+  } = await supabase
+    .from("assignment_checklist")
+    .select(
+      `
+      id,
+      item,
+      completed,
+      completed_at
+      `
+    )
+    .eq(
+      "assignment_id",
+      nextAssignment.id
+    );
+
+  if (checklistProgressError) {
+    throw new Error(
+      `No se pudo cargar tu checklist: ${checklistProgressError.message}`
+    );
+  }
+
+  /*
+   * Creamos un mapa:
+   *
+   * "Confirmar canciones" => true
+   * "Revisar instrumentos" => false
+   */
+  const completedChecklist =
+    new Map<string, boolean>(
+      (checklistProgress ?? []).map(
+        (row) => [
+          row.item,
+          Boolean(row.completed),
+        ]
+      )
+    );
+
+  const checklistItems =
+    team.checklist ?? [];
+
+  const completedCount =
+    checklistItems.filter(
+      (item: string) =>
+        completedChecklist.get(item) === true
+    ).length;
+
+  const checklistTotal =
+    checklistItems.length;
+
+  const checklistComplete =
+    checklistTotal > 0 &&
+    completedCount === checklistTotal;
+
+  /* =========================================================
+     PANTALLA
+  ========================================================= */
 
   return (
-    <main className="min-h-screen bg-[#f7f5f0] px-4 py-6">
-      <div className="mx-auto w-full max-w-xl space-y-5">
-        <header className="rounded-[34px] bg-stone-950 p-6 text-white shadow-xl">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
-            Comunidad VID
-          </p>
+    <div className="space-y-5 px-4 py-6 pb-28">
+      {/* =====================================================
+          CABECERA / ASIGNACIÓN
+      ====================================================== */}
 
-          <h1 className="mt-2 text-3xl font-bold">
-            Mi Servicio
+      <section className="overflow-hidden rounded-[34px] border border-stone-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
+        <div className="bg-gradient-to-br from-stone-950 via-stone-900 to-stone-800 px-5 py-7 text-white">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
+            <ShieldCheck size={13} />
+
+            Mi próximo servicio
+          </div>
+
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+            Hola, {profile.full_name}
           </h1>
 
-          <p className="mt-2 text-sm text-white/65">
-            Hola, {access.fullName}.
+          <p className="mt-2 text-sm leading-6 text-white/70">
+            Esta es tu próxima asignación en Comunidad VID.
           </p>
-        </header>
+        </div>
 
-        {!nextAssignment ? (
-          <section className="rounded-[32px] border border-stone-200 bg-white p-6 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100 text-stone-700">
-              <CalendarDays size={25} />
-            </div>
+        <div className="space-y-4 p-5">
+          {/* FECHA */}
 
-            <h2 className="mt-4 text-xl font-semibold text-stone-950">
-              No tienes servicios próximos
-            </h2>
+          <div className="rounded-[28px] border border-stone-100 bg-stone-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-stone-900 shadow-sm">
+                <CalendarDays size={21} />
+              </div>
 
-            <p className="mt-2 text-sm leading-6 text-stone-500">
-              Cuando seas asignado a un servicio aparecerá aquí.
-            </p>
-          </section>
-        ) : (
-          <>
-            <section className="rounded-[34px] border border-stone-200 bg-white p-6 shadow-sm">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-400">
-                Próximo servicio
-              </p>
-
-              <h2 className="mt-2 text-2xl font-semibold text-stone-950">
-                {nextAssignment.plan.title}
-              </h2>
-
-              <div className="mt-5 space-y-3 text-sm text-stone-600">
-                <p className="flex items-center gap-2">
-                  <CalendarDays size={17} />
-
-                  {formatDate(
-                    nextAssignment.plan
-                      .service_date
-                  )}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+                  Fecha
                 </p>
 
-                {nextAssignment.plan
-                  .service_time ? (
-                  <p className="flex items-center gap-2">
-                    <Clock3 size={17} />
+                <p className="mt-1 text-lg font-semibold text-stone-950">
+                  {formatAppDateLong(plan.service_date)}
+                </p>
 
-                    {
-                      nextAssignment.plan
-                        .service_time
-                    }
-                  </p>
-                ) : null}
-
-                {nextAssignment.plan
-                  .location ? (
-                  <p className="flex items-center gap-2">
-                    <MapPin size={17} />
-
-                    {
-                      nextAssignment.plan
-                        .location
-                    }
-                  </p>
-                ) : null}
+                <p className="mt-1 text-sm text-stone-600">
+                  {plan.title} ·{" "}
+                  {plan.service_time}
+                </p>
               </div>
-            </section>
+            </div>
+          </div>
 
-            <section className="rounded-[34px] bg-stone-950 p-6 text-white shadow-xl">
-              <p className="text-3xl">
-                {nextAssignment.team
-                  .emoji || "🤝"}
+          {/* EQUIPO */}
+
+          <div className="rounded-[28px] border border-emerald-100 bg-emerald-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-xl">
+                {team.emoji || "🤝"}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                  Tu equipo
+                </p>
+
+                <h2 className="mt-1 text-xl font-semibold text-stone-950">
+                  {team.team_name}
+                </h2>
+
+                <p className="mt-1 text-sm text-stone-600">
+                  {team.leader_name
+                    ? `Responsable: ${team.leader_name}`
+                    : "Responsable pendiente"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* HORARIOS */}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-[24px] border border-stone-100 bg-white p-4">
+              <Clock3
+                size={18}
+                className="text-stone-500"
+              />
+
+              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+                Llegada
               </p>
 
-              <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
-                Ministerio
+              <p className="mt-1 text-lg font-semibold text-stone-950">
+                {team.arrival_time ||
+                  "Por confirmar"}
+              </p>
+            </div>
+
+            <div className="rounded-[24px] border border-stone-100 bg-white p-4">
+              <CalendarDays
+                size={18}
+                className="text-stone-500"
+              />
+
+              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+                Servicio
               </p>
 
-              <h2 className="mt-1 text-2xl font-semibold">
-                {
-                  nextAssignment.team
-                    .team_name
-                }
+              <p className="mt-1 text-lg font-semibold text-stone-950">
+                {team.service_time ||
+                  plan.service_time}
+              </p>
+            </div>
+          </div>
+
+          {/* ESTADO */}
+
+          <div
+            className={`rounded-[24px] border p-4 ${getStatusClasses(
+              status
+            )}`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+              Estado
+            </p>
+
+            <p className="mt-1 text-lg font-semibold">
+              {getStatusLabel(status)}
+            </p>
+
+            {nextAssignment.note ? (
+              <p className="mt-2 text-sm leading-6">
+                {nextAssignment.note}
+              </p>
+            ) : null}
+          </div>
+
+          {/* =================================================
+              ACCIONES
+          ================================================= */}
+
+          <div className="space-y-3 pt-1">
+            {status === "confirmed" ? (
+              <div className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
+                <CheckCircle2 size={18} />
+
+                Asistencia confirmada
+              </div>
+            ) : (
+              <Link
+                href={`/mi-servicio/confirmar?id=${nextAssignment.id}`}
+                className="flex w-full items-center justify-center gap-2 rounded-[22px] bg-emerald-600 px-5 py-4 text-sm font-semibold text-white shadow-[0_12px_25px_rgba(5,150,105,0.22)] transition hover:bg-emerald-700"
+              >
+                <CheckCircle2 size={18} />
+
+                Confirmar que asistiré
+              </Link>
+            )}
+
+            <Link
+              href={`/mi-servicio/cambio?id=${nextAssignment.id}`}
+              className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+            >
+              <MessageCircle size={18} />
+
+              {status ===
+              "change_requested"
+                ? "Editar solicitud de cambio"
+                : "Solicitar cambio"}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          CHECKLIST PERSONAL
+      ====================================================== */}
+
+      {checklistItems.length > 0 ? (
+        <section className="rounded-[34px] border border-stone-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">
+            Preparación
+          </p>
+
+          <div className="mt-1 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-stone-950">
+                Mi checklist
               </h2>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-xs text-white/50">
-                    Llegada
-                  </p>
+              <p className="mt-2 text-sm leading-6 text-stone-500">
+                Marca cada tarea cuando la tengas lista.
+              </p>
+            </div>
 
-                  <p className="mt-1 font-semibold">
-                    {nextAssignment.team
-                      .arrival_time ||
-                      "Por confirmar"}
-                  </p>
-                </div>
+            <span
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                checklistComplete
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-stone-100 text-stone-600"
+              }`}
+            >
+              {completedCount}/
+              {checklistTotal}
+            </span>
+          </div>
 
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-xs text-white/50">
-                    Servicio
-                  </p>
+          {/* PROGRESO */}
 
-                  <p className="mt-1 font-semibold">
-                    {nextAssignment.team
-                      .service_time ||
-                      "Por confirmar"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex items-center gap-2 text-sm text-white/65">
-                <Users size={17} />
-                Sirves con el equipo de{" "}
-                {
-                  nextAssignment.team
-                    .team_name
-                }
-              </div>
-            </section>
-
-            <AssignmentResponse
-              assignmentId={
-                nextAssignment
-                  .assignment.id
-              }
-              currentStatus={
-                nextAssignment
-                  .assignment.status
-              }
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-100">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{
+                width:
+                  checklistTotal > 0
+                    ? `${
+                        (completedCount /
+                          checklistTotal) *
+                        100
+                      }%`
+                    : "0%",
+              }}
             />
-          </>
-        )}
-      </div>
-    </main>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {checklistItems.map(
+              (item: string) => (
+                <PersonalChecklistItem
+                  key={item}
+                  assignmentId={
+                    nextAssignment.id
+                  }
+                  item={item}
+                  completed={
+                    completedChecklist.get(
+                      item
+                    ) ?? false
+                  }
+                />
+              )
+            )}
+          </div>
+
+          {/* TODO COMPLETO */}
+
+          {checklistComplete ? (
+            <div className="mt-4 flex items-start gap-3 rounded-[22px] border border-emerald-100 bg-emerald-50 p-4 text-emerald-700">
+              <CheckCircle2
+                size={20}
+                className="mt-0.5 shrink-0"
+              />
+
+              <div>
+                <p className="font-semibold">
+                  Preparación completa
+                </p>
+
+                <p className="mt-1 text-sm leading-5">
+                  Ya completaste todas las tareas de preparación de tu
+                  equipo.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* =====================================================
+          EQUIPO
+      ====================================================== */}
+
+      {team.members?.length ? (
+        <section className="rounded-[34px] border border-stone-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">
+            Equipo
+          </p>
+
+          <h2 className="mt-1 text-xl font-semibold text-stone-950">
+            Servimos juntos
+          </h2>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {team.members.map(
+              (member: string) => (
+                <span
+                  key={member}
+                  className={`rounded-full px-3 py-2 text-sm font-semibold ${
+                    member ===
+                    profile.full_name
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-stone-100 text-stone-700"
+                  }`}
+                >
+                  {member}
+                </span>
+              )
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      {/* =====================================================
+          CUENTA
+      ====================================================== */}
+
+      <Link
+        href="/mi-cuenta"
+        className="flex items-center justify-center rounded-[22px] border border-stone-200 bg-white px-5 py-4 text-sm font-semibold text-stone-700 shadow-sm"
+      >
+        Ir a mi cuenta
+      </Link>
+    </div>
   );
 }
