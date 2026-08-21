@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { sendCoordinatorPush } from "@/lib/push/send-coordinator-push";
 
 /* =========================================================
    TIPOS
@@ -52,7 +53,8 @@ async function getAuthenticatedProfile() {
       `
       id,
       full_name,
-      auth_user_id
+      auth_user_id,
+      role
       `
     )
     .eq(
@@ -80,6 +82,7 @@ async function getAuthenticatedProfile() {
   return {
     ok: true as const,
     supabase,
+    user,
     profile,
   };
 }
@@ -100,6 +103,7 @@ async function getOwnedAssignment(
 
   const {
     supabase,
+    user,
     profile,
   } = auth;
 
@@ -115,7 +119,22 @@ async function getOwnedAssignment(
       service_plan_id,
       team_id,
       status,
-      note
+      note,
+
+      service_plans (
+        id,
+        service_date,
+        title,
+        service_time
+      ),
+
+      service_teams (
+        id,
+        team_name,
+        emoji,
+        arrival_time,
+        service_time
+      )
       `
     )
     .eq(
@@ -147,14 +166,41 @@ async function getOwnedAssignment(
   return {
     ok: true as const,
     supabase,
+    user,
     profile,
     assignment,
   };
 }
 
 /* =========================================================
+   FORMATEAR FECHA
+========================================================= */
+
+function formatServiceDate(
+  dateValue?: string | null
+) {
+  if (!dateValue) {
+    return "el próximo servicio";
+  }
+
+  return new Intl.DateTimeFormat(
+    "es-MX",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone:
+        "America/Mexico_City",
+    }
+  ).format(
+    new Date(
+      `${dateValue}T12:00:00`
+    )
+  );
+}
+
+/* =========================================================
    RESPONDER ASIGNACIÓN
-   USADA POR assignment-response.tsx
 ========================================================= */
 
 export async function respondToAssignmentAction(
@@ -221,6 +267,7 @@ export async function respondToAssignmentAction(
 
     const {
       supabase,
+      user,
       profile,
       assignment,
     } = owned;
@@ -268,6 +315,114 @@ export async function respondToAssignmentAction(
     }
 
     /* =====================================================
+       DATOS DE EQUIPO Y SERVICIO
+    ====================================================== */
+
+    const plan = Array.isArray(
+      assignment.service_plans
+    )
+      ? assignment.service_plans[0]
+      : assignment.service_plans;
+
+    const team = Array.isArray(
+      assignment.service_teams
+    )
+      ? assignment.service_teams[0]
+      : assignment.service_teams;
+
+    const serviceDate =
+      formatServiceDate(
+        plan?.service_date
+      );
+
+    const teamName =
+      team?.team_name ||
+      "su equipo";
+
+    /* =====================================================
+       PUSH A COORDINACIÓN
+    ====================================================== */
+
+    try {
+      if (
+        response ===
+        "confirmed"
+      ) {
+        await sendCoordinatorPush({
+          title:
+            "✅ Servicio confirmado",
+
+          body:
+            `${profile.full_name} confirmó su servicio en ${teamName} para ${serviceDate}.`,
+
+          url:
+            "/admin/servir",
+
+          type:
+            "assignment-confirmed",
+
+          entityType:
+            "assignment",
+
+          entityId:
+            assignment.id,
+
+          dedupeKey:
+            `assignment-confirmed-${assignment.id}`,
+
+          tag:
+            `assignment-${assignment.id}`,
+
+          excludeAuthUserId:
+            user.id,
+        });
+      }
+
+      if (
+        response ===
+        "change_requested"
+      ) {
+        await sendCoordinatorPush({
+          title:
+            "🔄 Solicitud de cambio",
+
+          body:
+            `${profile.full_name} solicitó un cambio en ${teamName} para ${serviceDate}. Motivo: ${cleanNote}`,
+
+          url:
+            "/admin/servir",
+
+          type:
+            "assignment-change-requested",
+
+          entityType:
+            "assignment",
+
+          entityId:
+            assignment.id,
+
+          dedupeKey:
+            `assignment-change-${assignment.id}-${Date.now()}`,
+
+          tag:
+            `assignment-change-${assignment.id}`,
+
+          excludeAuthUserId:
+            user.id,
+        });
+      }
+    } catch (pushError) {
+      /*
+       * Nunca cancelamos la respuesta
+       * del servidor porque falló Push.
+       */
+      console.error(
+        "COORDINATION PUSH ERROR:",
+        pushError
+      );
+    }
+
+    /* =====================================================
        REFRESCAR PANTALLAS
     ====================================================== */
 
@@ -309,7 +464,6 @@ export async function respondToAssignmentAction(
 
 /* =========================================================
    CONFIRMAR ASISTENCIA
-   COMPATIBILIDAD CON FORMULARIOS EXISTENTES
 ========================================================= */
 
 export async function confirmAssignment(
@@ -342,7 +496,6 @@ export async function confirmAssignment(
 
 /* =========================================================
    SOLICITAR CAMBIO
-   COMPATIBILIDAD CON FORMULARIOS EXISTENTES
 ========================================================= */
 
 export async function requestAssignmentChange(
@@ -473,7 +626,7 @@ export async function toggleChecklistItem(
   }
 
   /* =======================================================
-     ACTUALIZAR
+     ACTUALIZAR / CREAR
   ======================================================= */
 
   if (existingItem) {
@@ -503,10 +656,6 @@ export async function toggleChecklistItem(
       );
     }
   } else {
-    /* =====================================================
-       CREAR
-    ====================================================== */
-
     const {
       error: insertError,
     } = await supabase

@@ -241,6 +241,7 @@ export default async function AdminServirPage({
     <div className="min-h-screen bg-[#f7f5f0] px-4 py-6">
       <div className="mx-auto max-w-3xl space-y-6">
 
+
         {/* =====================================================
             ENCABEZADO + ESTADÍSTICAS
         ====================================================== */}
