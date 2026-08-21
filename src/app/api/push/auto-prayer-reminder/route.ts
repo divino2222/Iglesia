@@ -1,119 +1,395 @@
 import { NextResponse } from "next/server";
+import webpush from "web-push";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPushToAuthUser } from "@/lib/push/server";
-
-import {
-  formatAppDate,
-  getAppTodayString,
-  getDaysUntil,
-} from "@/lib/date-time";
 
 /* =========================================================
    TIPOS
 ========================================================= */
 
-type PendingAssignmentRow = {
-  id: string;
-  profile_id: string;
-  service_plan_id: string;
-  team_id: string;
-  status: string;
+type PrayerEvent = {
+  id: number;
+  title: string;
+  event_date: string | null;
+  event_time: string | null;
+  leader_name: string | null;
+};
 
-  profiles:
-    | {
-        id: string;
-        full_name: string;
-        auth_user_id: string | null;
-      }
-    | {
-        id: string;
-        full_name: string;
-        auth_user_id: string | null;
-      }[]
-    | null;
-
-  service_plans:
-    | {
-        id: string;
-        service_date: string;
-        title: string;
-        service_time: string;
-      }
-    | {
-        id: string;
-        service_date: string;
-        title: string;
-        service_time: string;
-      }[]
-    | null;
-
-  service_teams:
-    | {
-        id: string;
-        team_name: string;
-        arrival_time: string | null;
-      }
-    | {
-        id: string;
-        team_name: string;
-        arrival_time: string | null;
-      }[]
-    | null;
+type PushSubscriptionRow = {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  is_active: boolean;
 };
 
 /* =========================================================
-   NORMALIZAR RELACIONES SUPABASE
+   SEGURIDAD CRON
 ========================================================= */
 
-function firstRelation<T>(
-  value: T | T[] | null
-): T | null {
-  if (!value) {
-    return null;
+function isAuthorized(
+  request: Request
+) {
+  const isDevelopment =
+    process.env.NODE_ENV !==
+    "production";
+
+  /*
+   * En localhost permitimos
+   * ejecutar manualmente.
+   */
+  if (isDevelopment) {
+    return true;
   }
 
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
-  }
-
-  return value;
-}
-
-/* =========================================================
-   SEGURIDAD DEL CRON
-
-   En producción:
-   CRON_SECRET debe existir en variables de entorno.
-
-   En desarrollo permitimos localhost para poder probar.
-========================================================= */
-
-function isAuthorized(request: Request) {
   const secret =
     process.env.CRON_SECRET;
+
+  if (!secret) {
+    return false;
+  }
 
   const authorization =
     request.headers.get(
       "authorization"
     );
 
-  const isDevelopment =
-    process.env.NODE_ENV !==
-    "production";
-
-  if (isDevelopment) {
-    return true;
-  }
-
-  if (!secret) {
-    return false;
-  }
-
   return (
     authorization ===
     `Bearer ${secret}`
   );
+}
+
+/* =========================================================
+   CONFIGURAR WEB PUSH
+========================================================= */
+
+function configureWebPush() {
+  const subject =
+    process.env.VAPID_SUBJECT;
+
+  const publicKey =
+    process.env
+      .NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+  const privateKey =
+    process.env
+      .VAPID_PRIVATE_KEY;
+
+  if (
+    !subject ||
+    !publicKey ||
+    !privateKey
+  ) {
+    return {
+      ok: false as const,
+
+      error:
+        "Faltan variables VAPID. Revisa VAPID_SUBJECT, NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY.",
+    };
+  }
+
+  webpush.setVapidDetails(
+    subject,
+    publicKey,
+    privateKey
+  );
+
+  return {
+    ok: true as const,
+  };
+}
+
+/* =========================================================
+   HORA CDMX COMO RELOJ LOCAL
+========================================================= */
+
+function getMexicoCityNowParts() {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          "America/Mexico_City",
+
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+
+        hourCycle: "h23",
+      }
+    ).formatToParts(
+      new Date()
+    );
+
+  const values =
+    Object.fromEntries(
+      parts.map(
+        (part) => [
+          part.type,
+          part.value,
+        ]
+      )
+    );
+
+  return {
+    year:
+      Number(values.year),
+
+    month:
+      Number(values.month),
+
+    day:
+      Number(values.day),
+
+    hour:
+      Number(values.hour),
+
+    minute:
+      Number(values.minute),
+
+    second:
+      Number(values.second),
+  };
+}
+
+/* =========================================================
+   PARSEAR HORA
+========================================================= */
+
+function parseTimeTo24Hour(
+  time:
+    | string
+    | null
+    | undefined,
+
+  fallbackHour = 21,
+
+  fallbackMinute = 0
+) {
+  if (!time) {
+    return {
+      hour:
+        fallbackHour,
+
+      minute:
+        fallbackMinute,
+    };
+  }
+
+  const normalized =
+    time
+      .toLowerCase()
+      .trim()
+      .replace(/\./g, "");
+
+  /*
+   * Ej:
+   * 9:00 pm
+   * 09:00 PM
+   */
+  const match12 =
+    normalized.match(
+      /(\d{1,2}):(\d{2})\s*(am|pm)/
+    );
+
+  if (match12) {
+    let hour =
+      Number(
+        match12[1]
+      );
+
+    const minute =
+      Number(
+        match12[2]
+      );
+
+    const meridiem =
+      match12[3];
+
+    if (
+      meridiem === "pm" &&
+      hour !== 12
+    ) {
+      hour += 12;
+    }
+
+    if (
+      meridiem === "am" &&
+      hour === 12
+    ) {
+      hour = 0;
+    }
+
+    return {
+      hour,
+      minute,
+    };
+  }
+
+  /*
+   * Ej:
+   * 21:00
+   */
+  const match24 =
+    normalized.match(
+      /(\d{1,2}):(\d{2})/
+    );
+
+  if (match24) {
+    return {
+      hour:
+        Number(
+          match24[1]
+        ),
+
+      minute:
+        Number(
+          match24[2]
+        ),
+    };
+  }
+
+  return {
+    hour:
+      fallbackHour,
+
+    minute:
+      fallbackMinute,
+  };
+}
+
+/* =========================================================
+   CONVERTIR FECHA/HORA LOCAL A VALOR COMPARABLE
+
+   No buscamos convertir realmente
+   a UTC.
+
+   Creamos una representación numérica
+   consistente del reloj local de CDMX
+   para poder calcular minutos faltantes.
+========================================================= */
+
+function localDateTimeValue(
+  dateStr: string,
+  timeStr:
+    | string
+    | null
+) {
+  const [
+    year,
+    month,
+    day,
+  ] =
+    dateStr
+      .split("-")
+      .map(Number);
+
+  const {
+    hour,
+    minute,
+  } =
+    parseTimeTo24Hour(
+      timeStr,
+      21,
+      0
+    );
+
+  return Date.UTC(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+    0,
+    0
+  );
+}
+
+/* =========================================================
+   AHORA EN VALOR LOCAL CDMX
+========================================================= */
+
+function getMexicoCityNowValue() {
+  const now =
+    getMexicoCityNowParts();
+
+  return Date.UTC(
+    now.year,
+    now.month - 1,
+    now.day,
+    now.hour,
+    now.minute,
+    now.second,
+    0
+  );
+}
+
+/* =========================================================
+   FECHA EN ESPAÑOL
+========================================================= */
+
+function formatSpanishDate(
+  dateStr: string
+) {
+  const [
+    year,
+    month,
+    day,
+  ] =
+    dateStr
+      .split("-")
+      .map(Number);
+
+  /*
+   * Usamos mediodía UTC para evitar
+   * cambios accidentales de día.
+   */
+  const date =
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        day,
+        12
+      )
+    );
+
+  return date.toLocaleDateString(
+    "es-MX",
+    {
+      weekday:
+        "long",
+
+      day:
+        "numeric",
+
+      month:
+        "long",
+
+      timeZone:
+        "America/Mexico_City",
+    }
+  );
+}
+
+/* =========================================================
+   FORMATEAR HORA
+========================================================= */
+
+function formatPrayerTime(
+  time:
+    | string
+    | null
+) {
+  if (!time) {
+    return "9:00 PM";
+  }
+
+  return time;
 }
 
 /* =========================================================
@@ -129,11 +405,14 @@ export async function GET(
     ====================================================== */
 
     if (
-      !isAuthorized(request)
+      !isAuthorized(
+        request
+      )
     ) {
       return NextResponse.json(
         {
           ok: false,
+
           error:
             "No autorizado.",
         },
@@ -143,71 +422,20 @@ export async function GET(
       );
     }
 
-    const supabase =
-      createAdminClient();
-
-    const today =
-      getAppTodayString();
-
     /* =====================================================
-       2. BUSCAR ASIGNACIONES PENDIENTES
-
-       Solamente:
-       - status = pending
-       - hoy o futuras
-
-       La ventana exacta de 3 días
-       se valida después.
+       2. VAPID
     ====================================================== */
 
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("assignments")
-      .select(
-        `
-        id,
-        profile_id,
-        service_plan_id,
-        team_id,
-        status,
+    const vapid =
+      configureWebPush();
 
-        profiles (
-          id,
-          full_name,
-          auth_user_id
-        ),
-
-        service_plans (
-          id,
-          service_date,
-          title,
-          service_time
-        ),
-
-        service_teams (
-          id,
-          team_name,
-          arrival_time
-        )
-        `
-      )
-      .eq(
-        "status",
-        "pending"
-      )
-      .gte(
-        "service_plans.service_date",
-        today
-      );
-
-    if (error) {
+    if (!vapid.ok) {
       return NextResponse.json(
         {
           ok: false,
+
           error:
-            error.message,
+            vapid.error,
         },
         {
           status: 500,
@@ -215,408 +443,489 @@ export async function GET(
       );
     }
 
-    const assignments =
-      (data ??
-        []) as PendingAssignmentRow[];
-
     /* =====================================================
-       3. CONTADORES
+       3. SUPABASE ADMIN
     ====================================================== */
 
-    let reviewed = 0;
-    let eligible = 0;
+    const supabase =
+      createAdminClient();
+
+    const nowValue =
+      getMexicoCityNowValue();
+
+    /* =====================================================
+       4. BUSCAR NOCHES DE ORACIÓN
+    ====================================================== */
+
+    const {
+      data: eventsData,
+      error:
+        eventsError,
+    } = await supabase
+      .from("events")
+      .select(
+        `
+        id,
+        title,
+        event_date,
+        event_time,
+        leader_name
+        `
+      )
+      .eq(
+        "title",
+        "Noche de oración"
+      )
+      .order(
+        "event_date",
+        {
+          ascending:
+            true,
+        }
+      );
+
+    if (eventsError) {
+      return NextResponse.json(
+        {
+          ok: false,
+
+          error:
+            eventsError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /* =====================================================
+       5. CONSTRUIR PRÓXIMA ORACIÓN
+    ====================================================== */
+
+    const events =
+      (
+        (eventsData ??
+          []) as PrayerEvent[]
+      )
+        .filter(
+          (
+            event
+          ): event is PrayerEvent & {
+            event_date: string;
+          } =>
+            Boolean(
+              event.event_date
+            )
+        )
+        .map(
+          (event) => ({
+            ...event,
+
+            startsAtValue:
+              localDateTimeValue(
+                event.event_date,
+                event.event_time
+              ),
+          })
+        )
+        .filter(
+          (event) =>
+            event.startsAtValue >
+            nowValue
+        )
+        .sort(
+          (a, b) =>
+            a.startsAtValue -
+            b.startsAtValue
+        );
+
+    const nextPrayer =
+      events[0];
+
+    if (!nextPrayer) {
+      return NextResponse.json({
+        ok: true,
+
+        skipped: true,
+
+        reason:
+          "No hay próxima oración programada.",
+      });
+    }
+
+    /* =====================================================
+       6. MINUTOS RESTANTES
+    ====================================================== */
+
+    const diffMs =
+      nextPrayer.startsAtValue -
+      nowValue;
+
+    const diffMinutes =
+      Math.floor(
+        diffMs /
+          60_000
+      );
+
+    /*
+     * El cron se ejecutará
+     * aproximadamente 30 minutos antes.
+     *
+     * Permitimos margen de 20 a 40 minutos.
+     */
+    if (
+      diffMinutes < 20 ||
+      diffMinutes > 40
+    ) {
+      return NextResponse.json({
+        ok: true,
+
+        skipped: true,
+
+        reason:
+          `Fuera de ventana. Faltan ${diffMinutes} min.`,
+
+        nextPrayer: {
+          id:
+            nextPrayer.id,
+
+          event_date:
+            nextPrayer.event_date,
+
+          event_time:
+            nextPrayer.event_time,
+
+          leader_name:
+            nextPrayer.leader_name,
+        },
+      });
+    }
+
+    /* =====================================================
+       7. EVITAR DUPLICADOS
+    ====================================================== */
+
+    const dedupeKey =
+      `prayer-reminder-${nextPrayer.id}-${nextPrayer.event_date}-${nextPrayer.event_time ?? "21:00"}`;
+
+    const {
+      data:
+        existingLog,
+
+      error:
+        existingLogError,
+    } = await supabase
+      .from(
+        "push_delivery_log"
+      )
+      .select("id")
+      .eq(
+        "dedupe_key",
+        dedupeKey
+      )
+      .maybeSingle();
+
+    if (
+      existingLogError
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+
+          error:
+            `No se pudo revisar el historial Push: ${existingLogError.message}`,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (existingLog) {
+      return NextResponse.json({
+        ok: true,
+
+        skipped: true,
+
+        reason:
+          "Ya se envió este recordatorio.",
+      });
+    }
+
+    /* =====================================================
+       8. SUSCRIPCIONES ACTIVAS
+    ====================================================== */
+
+    const {
+      data:
+        subscriptionsData,
+
+      error:
+        subscriptionsError,
+    } = await supabase
+      .from(
+        "push_subscriptions"
+      )
+      .select(
+        `
+        endpoint,
+        p256dh,
+        auth,
+        is_active
+        `
+      )
+      .eq(
+        "is_active",
+        true
+      );
+
+    if (
+      subscriptionsError
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+
+          error:
+            subscriptionsError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    const subscriptions =
+      (
+        subscriptionsData ??
+        []
+      ) as PushSubscriptionRow[];
+
+    if (
+      subscriptions.length ===
+      0
+    ) {
+      return NextResponse.json({
+        ok: true,
+
+        skipped: true,
+
+        reason:
+          "No hay dispositivos Push activos.",
+      });
+    }
+
+    /* =====================================================
+       9. MENSAJE
+    ====================================================== */
+
+    const leaderName =
+      nextPrayer.leader_name
+        ?.trim() ||
+      "el líder asignado";
+
+    const dateText =
+      formatSpanishDate(
+        nextPrayer.event_date
+      );
+
+    const timeText =
+      formatPrayerTime(
+        nextPrayer.event_time
+      );
+
+    const payload =
+      JSON.stringify({
+        title:
+          "🙏 Oración en Comunidad VID",
+
+        body:
+          `En 30 minutos comenzamos nuestra noche de oración. Hoy dirige ${leaderName}. ${dateText} · ${timeText}.`,
+
+        url:
+          "/eventos",
+
+        icon:
+          "/icons/icon-192.png",
+
+        badge:
+          "/icons/icon-192.png",
+
+        tag:
+          `prayer-${nextPrayer.id}`,
+
+        requireInteraction:
+          false,
+      });
+
+    /* =====================================================
+       10. ENVIAR PUSH
+    ====================================================== */
+
     let sent = 0;
     let failed = 0;
-    let skippedAlreadySent = 0;
-    let skippedNoAccount = 0;
-    let skippedOutsideWindow = 0;
-
-    const results: Array<{
-      assignmentId: string;
-      profileName: string | null;
-      serviceDate: string | null;
-      daysUntil: number | null;
-      result: string;
-    }> = [];
-
-    /* =====================================================
-       4. REVISAR CADA ASIGNACIÓN
-    ====================================================== */
 
     for (
-      const assignment of
-      assignments
+      const subscription of
+      subscriptions
     ) {
-      reviewed++;
-
-      const profile =
-        firstRelation(
-          assignment.profiles
-        );
-
-      const plan =
-        firstRelation(
-          assignment.service_plans
-        );
-
-      const team =
-        firstRelation(
-          assignment.service_teams
-        );
-
-      if (!plan) {
-        results.push({
-          assignmentId:
-            assignment.id,
-
-          profileName:
-            profile?.full_name ??
-            null,
-
-          serviceDate:
-            null,
-
-          daysUntil:
-            null,
-
-          result:
-            "Sin plan asociado",
-        });
-
-        continue;
-      }
-
-      const daysUntil =
-        getDaysUntil(
-          plan.service_date
-        );
-
-      /* ===================================================
-         VENTANA
-
-         Avisamos desde 3 días antes
-         hasta el mismo día.
-      =================================================== */
-
-      if (
-        daysUntil < 0 ||
-        daysUntil > 3
-      ) {
-        skippedOutsideWindow++;
-
-        continue;
-      }
-
-      eligible++;
-
-      /* ===================================================
-         DEBE TENER CUENTA AUTH
-      =================================================== */
-
-      if (
-        !profile?.auth_user_id
-      ) {
-        skippedNoAccount++;
-
-        results.push({
-          assignmentId:
-            assignment.id,
-
-          profileName:
-            profile?.full_name ??
-            null,
-
-          serviceDate:
-            plan.service_date,
-
-          daysUntil,
-
-          result:
-            "Perfil sin cuenta vinculada",
-        });
-
-        continue;
-      }
-
-      /* ===================================================
-         DEDUPE
-
-         Una notificación por asignación
-         para esta ventana de confirmación.
-      =================================================== */
-
-      const dedupeKey =
-        `service-confirmation-reminder-${assignment.id}-${plan.service_date}`;
-
-      const {
-        data: existingLog,
-        error: logCheckError,
-      } = await supabase
-        .from(
-          "push_delivery_log"
-        )
-        .select("id")
-        .eq(
-          "dedupe_key",
-          dedupeKey
-        )
-        .maybeSingle();
-
-      if (logCheckError) {
-        console.error(
-          "No se pudo revisar push_delivery_log:",
-          logCheckError
-        );
-
-        failed++;
-
-        continue;
-      }
-
-      if (existingLog) {
-        skippedAlreadySent++;
-
-        continue;
-      }
-
-      /* ===================================================
-         MENSAJE
-      =================================================== */
-
-      const name =
-        profile.full_name ||
-        "Hola";
-
-      const teamName =
-        team?.team_name ||
-        "tu equipo";
-
-      const formattedDate =
-        formatAppDate(
-          plan.service_date,
-          {
-            weekday:
-              "long",
-
-            day:
-              "numeric",
-
-            month:
-              "long",
-          }
-        );
-
-      let title =
-        "⏰ Tu servicio está próximo";
-
-      let body =
-        `${name}, aún no has confirmado tu asistencia para ${teamName} el ${formattedDate}. Entra a Comunidad VID para confirmar o solicitar un cambio.`;
-
-      /*
-       * El mismo día hacemos el mensaje
-       * un poco más urgente.
-       */
-      if (daysUntil === 0) {
-        title =
-          "🙌 Hoy tienes servicio";
-
-        body =
-          `${name}, hoy estás asignado a ${teamName} y tu asistencia sigue pendiente de confirmar. Revisa tu servicio en Comunidad VID.`;
-      }
-
-      /* ===================================================
-         ENVIAR
-      =================================================== */
-
       try {
-        const pushResult =
-          await sendPushToAuthUser({
-            authUserId:
-              profile.auth_user_id,
+        await webpush.sendNotification(
+          {
+            endpoint:
+              subscription.endpoint,
 
-            payload: {
-              title,
+            keys: {
+              p256dh:
+                subscription.p256dh,
 
-              body,
-
-              url:
-                "/mi-servicio",
-
-              tag:
-                `service-reminder-${assignment.id}`,
-
-              requireInteraction:
-                daysUntil === 0,
-
-              assignmentId:
-                assignment.id,
-
-              servicePlanId:
-                assignment.service_plan_id,
+              auth:
+                subscription.auth,
             },
-          });
-
-        sent +=
-          pushResult.sent;
-
-        failed +=
-          pushResult.failed;
-
-        /* =================================================
-           SOLO MARCAMOS COMO ENVIADO
-           SI AL MENOS UN DISPOSITIVO LO RECIBIÓ
-        ================================================= */
-
-        if (
-          pushResult.sent > 0
-        ) {
-          const {
-            error: insertLogError,
-          } = await supabase
-            .from(
-              "push_delivery_log"
-            )
-            .insert({
-              kind:
-                "service-confirmation-reminder",
-
-              dedupe_key:
-                dedupeKey,
-
-              payload: {
-                assignment_id:
-                  assignment.id,
-
-                profile_id:
-                  assignment.profile_id,
-
-                profile_name:
-                  profile.full_name,
-
-                service_plan_id:
-                  assignment.service_plan_id,
-
-                team_id:
-                  assignment.team_id,
-
-                team_name:
-                  team?.team_name ??
-                  null,
-
-                service_date:
-                  plan.service_date,
-
-                days_until:
-                  daysUntil,
-
-                sent:
-                  pushResult.sent,
-
-                failed:
-                  pushResult.failed,
-              },
-            });
-
-          if (
-            insertLogError
-          ) {
-            console.error(
-              "No se pudo registrar push_delivery_log:",
-              insertLogError
-            );
-          }
-
-          results.push({
-            assignmentId:
-              assignment.id,
-
-            profileName:
-              profile.full_name,
-
-            serviceDate:
-              plan.service_date,
-
-            daysUntil,
-
-            result:
-              `Enviado a ${pushResult.sent} dispositivo(s)`,
-          });
-        } else {
-          results.push({
-            assignmentId:
-              assignment.id,
-
-            profileName:
-              profile.full_name,
-
-            serviceDate:
-              plan.service_date,
-
-            daysUntil,
-
-            result:
-              "No hay dispositivo Push disponible",
-          });
-        }
-      } catch (pushError) {
-        failed++;
-
-        console.error(
-          "Error enviando recordatorio de servicio:",
-          pushError
+          },
+          payload
         );
 
-        results.push({
-          assignmentId:
-            assignment.id,
+        sent++;
+      } catch (error) {
+        failed++;
 
-          profileName:
-            profile.full_name,
+        const statusCode =
+          (
+            error as {
+              statusCode?:
+                number;
+            }
+          ).statusCode;
 
-          serviceDate:
-            plan.service_date,
+        console.error(
+          "ERROR PUSH ORACIÓN:",
+          error
+        );
 
-          daysUntil,
+        /*
+         * 404 / 410:
+         * la suscripción ya murió.
+         */
+        if (
+          statusCode === 404 ||
+          statusCode === 410
+        ) {
+          await supabase
+            .from(
+              "push_subscriptions"
+            )
+            .update({
+              is_active:
+                false,
 
-          result:
-            "Error de envío",
-        });
+              updated_at:
+                new Date()
+                  .toISOString(),
+            })
+            .eq(
+              "endpoint",
+              subscription.endpoint
+            );
+        }
       }
     }
 
     /* =====================================================
-       5. RESPUESTA
+       11. GUARDAR LOG
+
+       Solo guardamos dedupe si
+       realmente se entregó al menos
+       a un dispositivo.
+    ====================================================== */
+
+    if (sent > 0) {
+      const {
+        error:
+          insertLogError,
+      } = await supabase
+        .from(
+          "push_delivery_log"
+        )
+        .insert({
+          kind:
+            "prayer-reminder",
+
+          dedupe_key:
+            dedupeKey,
+
+          payload: {
+            event_id:
+              nextPrayer.id,
+
+            leader_name:
+              nextPrayer.leader_name,
+
+            event_date:
+              nextPrayer.event_date,
+
+            event_time:
+              nextPrayer.event_time,
+
+            minutes_before:
+              diffMinutes,
+
+            sent,
+
+            failed,
+          },
+        });
+
+      if (
+        insertLogError
+      ) {
+        console.error(
+          "No se pudo guardar push_delivery_log:",
+          insertLogError
+        );
+      }
+    }
+
+    /* =====================================================
+       12. RESULTADO
     ====================================================== */
 
     return NextResponse.json({
-      ok: true,
-
-      today,
-
-      reviewed,
-
-      eligible,
+      ok:
+        sent > 0,
 
       sent,
 
       failed,
 
-      skipped: {
-        alreadySent:
-          skippedAlreadySent,
+      subscriptions:
+        subscriptions.length,
 
-        noLinkedAccount:
-          skippedNoAccount,
+      event: {
+        id:
+          nextPrayer.id,
 
-        outsideWindow:
-          skippedOutsideWindow,
+        date:
+          nextPrayer.event_date,
+
+        time:
+          nextPrayer.event_time,
+
+        leader:
+          nextPrayer.leader_name,
+
+        minutesUntil:
+          diffMinutes,
       },
 
-      results,
+      message:
+        sent > 0
+          ? "Recordatorio de oración enviado."
+          : "No se pudo enviar el recordatorio.",
     });
   } catch (error) {
     console.error(
-      "AUTO SERVICE REMINDER ERROR:",
+      "AUTO PRAYER REMINDER ERROR:",
       error
     );
 

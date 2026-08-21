@@ -3,6 +3,10 @@
     {
       "path": "/api/push/auto-service-reminder",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/push/auto-prayer-reminder",
+      "schedule": "30 2 * * 3,5"
     }
   ]
 }
