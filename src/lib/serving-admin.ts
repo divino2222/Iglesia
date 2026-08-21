@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppTodayString } from "@/lib/date-time";
 
+/* =========================================================
+   ESTADOS
+========================================================= */
+
 export type ServiceStatus =
   | "ready"
   | "pending"
@@ -59,9 +63,6 @@ export type ProfileRow = {
   ministries: string[] | null;
   is_active: boolean;
 
-  /*
-   * Vinculación con Supabase Auth
-   */
   auth_user_id: string | null;
   email: string | null;
 
@@ -69,7 +70,7 @@ export type ProfileRow = {
 };
 
 /* =========================================================
-   ASIGNACIONES / RESPUESTAS
+   ASIGNACIONES
 ========================================================= */
 
 export type AssignmentRow = {
@@ -98,16 +99,46 @@ export type AssignmentChecklistRow = {
 };
 
 /* =========================================================
+   ACTIVIDAD
+========================================================= */
+
+export type ActivityLogRow = {
+  id: string;
+
+  action: string;
+  entity_type: string;
+  description: string;
+
+  actor_name: string | null;
+  profile_id: string | null;
+  entity_id: string | null;
+  service_plan_id: string | null;
+  team_id: string | null;
+
+  metadata: Record<string, unknown> | null;
+
+  created_at: string;
+};
+
+/* =========================================================
    RESPUESTA COMPLETA DEL ADMIN
 ========================================================= */
 
 export type ServingAdminData = {
   plan: ServicePlanRow | null;
+
   plans: ServicePlanRow[];
+
   teams: ServiceTeamRow[];
+
   profiles: ProfileRow[];
+
   assignments: AssignmentRow[];
-  assignmentChecklist: AssignmentChecklistRow[];
+
+  assignmentChecklist:
+    AssignmentChecklistRow[];
+
+  activities: ActivityLogRow[];
 };
 
 /* =========================================================
@@ -146,32 +177,38 @@ export async function getServingAdminData(
      2. DETERMINAR QUÉ PLAN EDITAR
   ======================================================= */
 
-  let plan: ServicePlanRow | null = null;
+  let plan: ServicePlanRow | null =
+    null;
 
   if (selectedPlanId) {
     plan =
       plans.find(
         (item) =>
-          item.id === selectedPlanId
+          item.id ===
+          selectedPlanId
       ) ?? null;
   }
 
   /*
-   * Si no se eligió un plan manualmente:
+   * Si no se eligió manualmente:
    *
-   * buscamos primero el próximo servicio.
-   * Si no existe uno futuro, usamos el más reciente.
+   * buscamos el próximo servicio.
+   *
+   * Si no hay uno futuro,
+   * usamos el más reciente.
    */
 
   if (!plan && plans.length > 0) {
-    const today = getAppTodayString();
+    const today =
+      getAppTodayString();
 
     const upcomingPlans = [
       ...plans,
     ]
       .filter(
         (item) =>
-          item.service_date >= today
+          item.service_date >=
+          today
       )
       .sort((a, b) =>
         a.service_date.localeCompare(
@@ -182,7 +219,8 @@ export async function getServingAdminData(
     if (
       upcomingPlans.length > 0
     ) {
-      plan = upcomingPlans[0];
+      plan =
+        upcomingPlans[0];
     } else {
       plan = plans[0];
     }
@@ -225,22 +263,29 @@ export async function getServingAdminData(
     (profilesData ?? []) as ProfileRow[];
 
   /* =======================================================
-     SI TODAVÍA NO HAY PLAN
+     SI NO HAY PLAN
   ======================================================= */
 
   if (!plan) {
     return {
       plan: null,
+
       plans,
+
       teams: [],
+
       profiles,
+
       assignments: [],
+
       assignmentChecklist: [],
+
+      activities: [],
     };
   }
 
   /* =======================================================
-     4. EQUIPOS DEL PLAN SELECCIONADO
+     4. EQUIPOS DEL PLAN
   ======================================================= */
 
   const {
@@ -267,7 +312,7 @@ export async function getServingAdminData(
     (teamsData ?? []) as ServiceTeamRow[];
 
   /* =======================================================
-     5. ASIGNACIONES DEL PLAN SELECCIONADO
+     5. ASIGNACIONES
   ======================================================= */
 
   const {
@@ -303,7 +348,7 @@ export async function getServingAdminData(
       []) as AssignmentRow[];
 
   /* =======================================================
-     6. CHECKLIST INDIVIDUAL DE LAS ASIGNACIONES
+     6. CHECKLIST INDIVIDUAL
   ======================================================= */
 
   const assignmentIds =
@@ -312,13 +357,12 @@ export async function getServingAdminData(
         assignment.id
     );
 
-  let assignmentChecklist: AssignmentChecklistRow[] =
-    [];
+  let assignmentChecklist:
+    AssignmentChecklistRow[] = [];
 
-  /*
-   * Evitamos hacer .in() con un arreglo vacío.
-   */
-  if (assignmentIds.length > 0) {
+  if (
+    assignmentIds.length > 0
+  ) {
     const {
       data: checklistData,
       error: checklistError,
@@ -354,19 +398,65 @@ export async function getServingAdminData(
   }
 
   /* =======================================================
-     7. RESPUESTA COMPLETA
+     7. ACTIVIDAD DEL SERVICIO
+  ======================================================= */
+
+  const {
+    data: activityData,
+    error: activityError,
+  } = await supabase
+    .from("activity_log")
+    .select(
+      `
+      id,
+      action,
+      entity_type,
+      description,
+      actor_name,
+      profile_id,
+      entity_id,
+      service_plan_id,
+      team_id,
+      metadata,
+      created_at
+      `
+    )
+    .eq(
+      "service_plan_id",
+      plan.id
+    )
+    .order("created_at", {
+      ascending: false,
+    })
+    .limit(50);
+
+  if (activityError) {
+    throw new Error(
+      `No se pudo cargar la actividad reciente: ${activityError.message}`
+    );
+  }
+
+  const activities =
+    (activityData ??
+      []) as ActivityLogRow[];
+
+  /* =======================================================
+     8. RESPUESTA COMPLETA
   ======================================================= */
 
   return {
     plan,
+
     plans,
+
     teams,
+
     profiles,
+
     assignments,
+
     assignmentChecklist,
+
+    activities,
   };
 }
-
-/* =========================================================
-   FECHA LOCAL YYYY-MM-DD
-========================================================= */

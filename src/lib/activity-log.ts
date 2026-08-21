@@ -14,7 +14,12 @@ export type ActivityAction =
   | "reopened_change_request"
   | "admin_confirmed_assignment"
   | "replacement_confirmed"
-  | "admin_marked_pending";
+  | "admin_marked_pending"
+  | "linked_profile_account"
+  | "unlinked_profile_account"
+  | "reassigned_assignment"
+  | "kept_assignment_pending"
+  | "resolved_assignment_change";
 
 type LogActivityInput = {
   action: ActivityAction;

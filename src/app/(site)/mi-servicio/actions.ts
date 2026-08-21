@@ -2,63 +2,106 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/server";
+
+/* =========================================================
+   TIPOS
+========================================================= */
+
+type AssignmentResponse =
+  | "confirmed"
+  | "change_requested";
+
+type AssignmentActionResult = {
+  success: boolean;
+  error?: string;
+};
 
 /* =========================================================
    OBTENER PERFIL AUTENTICADO
 ========================================================= */
 
 async function getAuthenticatedProfile() {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
     error: userError,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
-  if (userError || !user) {
-    redirect("/login");
+  if (
+    userError ||
+    !user
+  ) {
+    return {
+      ok: false as const,
+      error:
+        "Debes iniciar sesión.",
+    };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const {
+    data: profile,
+    error: profileError,
+  } = await supabase
     .from("profiles")
-    .select("id,full_name,auth_user_id")
-    .eq("auth_user_id", user.id)
+    .select(
+      `
+      id,
+      full_name,
+      auth_user_id
+      `
+    )
+    .eq(
+      "auth_user_id",
+      user.id
+    )
     .maybeSingle();
 
   if (profileError) {
-    throw new Error(
-      `No se pudo consultar tu perfil: ${profileError.message}`
-    );
+    return {
+      ok: false as const,
+      error:
+        `No se pudo consultar tu perfil: ${profileError.message}`,
+    };
   }
 
   if (!profile) {
-    throw new Error(
-      "Tu cuenta todavía no está vinculada con un perfil de servidor."
-    );
+    return {
+      ok: false as const,
+      error:
+        "Tu cuenta todavía no está vinculada con un perfil de servidor.",
+    };
   }
 
   return {
+    ok: true as const,
     supabase,
     profile,
   };
 }
 
 /* =========================================================
-   CONFIRMAR ASISTENCIA
+   VALIDAR ASIGNACIÓN DEL USUARIO
 ========================================================= */
 
-export async function confirmAssignment(formData: FormData) {
-  const assignmentId = String(
-    formData.get("assignment_id") || ""
-  ).trim();
+async function getOwnedAssignment(
+  assignmentId: string
+) {
+  const auth =
+    await getAuthenticatedProfile();
 
-  if (!assignmentId) {
-    throw new Error("Falta identificar la asignación.");
+  if (!auth.ok) {
+    return auth;
   }
 
-  const { supabase, profile } =
-    await getAuthenticatedProfile();
+  const {
+    supabase,
+    profile,
+  } = auth;
 
   const {
     data: assignment,
@@ -71,125 +114,271 @@ export async function confirmAssignment(formData: FormData) {
       profile_id,
       service_plan_id,
       team_id,
-      status
+      status,
+      note
       `
     )
-    .eq("id", assignmentId)
-    .eq("profile_id", profile.id)
+    .eq(
+      "id",
+      assignmentId
+    )
+    .eq(
+      "profile_id",
+      profile.id
+    )
     .maybeSingle();
 
   if (assignmentError) {
-    throw new Error(
-      `No se pudo consultar la asignación: ${assignmentError.message}`
-    );
+    return {
+      ok: false as const,
+      error:
+        `No se pudo consultar la asignación: ${assignmentError.message}`,
+    };
   }
 
   if (!assignment) {
+    return {
+      ok: false as const,
+      error:
+        "Esta asignación no existe o no pertenece a tu cuenta.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    supabase,
+    profile,
+    assignment,
+  };
+}
+
+/* =========================================================
+   RESPONDER ASIGNACIÓN
+   USADA POR assignment-response.tsx
+========================================================= */
+
+export async function respondToAssignmentAction(
+  assignmentId: string,
+  response: AssignmentResponse,
+  note = ""
+): Promise<AssignmentActionResult> {
+  try {
+    const cleanAssignmentId =
+      String(
+        assignmentId || ""
+      ).trim();
+
+    const cleanNote =
+      String(
+        note || ""
+      ).trim();
+
+    if (!cleanAssignmentId) {
+      return {
+        success: false,
+        error:
+          "Falta identificar la asignación.",
+      };
+    }
+
+    if (
+      response !==
+        "confirmed" &&
+      response !==
+        "change_requested"
+    ) {
+      return {
+        success: false,
+        error:
+          "La respuesta seleccionada no es válida.",
+      };
+    }
+
+    if (
+      response ===
+        "change_requested" &&
+      cleanNote.length < 5
+    ) {
+      return {
+        success: false,
+        error:
+          "Escribe brevemente el motivo por el que necesitas un cambio.",
+      };
+    }
+
+    const owned =
+      await getOwnedAssignment(
+        cleanAssignmentId
+      );
+
+    if (!owned.ok) {
+      return {
+        success: false,
+        error:
+          owned.error,
+      };
+    }
+
+    const {
+      supabase,
+      profile,
+      assignment,
+    } = owned;
+
+    /* =====================================================
+       ACTUALIZAR RESPUESTA
+    ====================================================== */
+
+    const {
+      error: updateError,
+    } = await supabase
+      .from("assignments")
+      .update({
+        status:
+          response,
+
+        note:
+          response ===
+          "change_requested"
+            ? cleanNote
+            : null,
+
+        updated_at:
+          new Date()
+            .toISOString(),
+      })
+      .eq(
+        "id",
+        assignment.id
+      )
+      .eq(
+        "profile_id",
+        profile.id
+      );
+
+    if (updateError) {
+      return {
+        success: false,
+        error:
+          response ===
+          "confirmed"
+            ? `No se pudo confirmar tu asistencia: ${updateError.message}`
+            : `No se pudo enviar tu solicitud de cambio: ${updateError.message}`,
+      };
+    }
+
+    /* =====================================================
+       REFRESCAR PANTALLAS
+    ====================================================== */
+
+    revalidatePath(
+      "/mi-servicio"
+    );
+
+    revalidatePath(
+      "/mi-cuenta"
+    );
+
+    revalidatePath(
+      "/"
+    );
+
+    revalidatePath(
+      "/admin/servir"
+    );
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error(
+      "RESPOND TO ASSIGNMENT ERROR:",
+      error
+    );
+
+    return {
+      success: false,
+
+      error:
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar tu respuesta.",
+    };
+  }
+}
+
+/* =========================================================
+   CONFIRMAR ASISTENCIA
+   COMPATIBILIDAD CON FORMULARIOS EXISTENTES
+========================================================= */
+
+export async function confirmAssignment(
+  formData: FormData
+) {
+  const assignmentId =
+    String(
+      formData.get(
+        "assignment_id"
+      ) || ""
+    ).trim();
+
+  const result =
+    await respondToAssignmentAction(
+      assignmentId,
+      "confirmed"
+    );
+
+  if (!result.success) {
     throw new Error(
-      "Esta asignación no existe o no pertenece a tu cuenta."
+      result.error ||
+        "No se pudo confirmar tu asistencia."
     );
   }
 
-  const { error: updateError } = await supabase
-    .from("assignments")
-    .update({
-      status: "confirmed",
-      note: null,
-    })
-    .eq("id", assignment.id)
-    .eq("profile_id", profile.id);
-
-  if (updateError) {
-    throw new Error(
-      `No se pudo confirmar tu asistencia: ${updateError.message}`
-    );
-  }
-
-  revalidatePath("/mi-servicio");
-  revalidatePath("/mi-cuenta");
-  revalidatePath("/admin/servir");
-
-  redirect("/mi-servicio?confirmado=1");
+  redirect(
+    "/mi-servicio?confirmado=1"
+  );
 }
 
 /* =========================================================
    SOLICITAR CAMBIO
+   COMPATIBILIDAD CON FORMULARIOS EXISTENTES
 ========================================================= */
 
 export async function requestAssignmentChange(
   formData: FormData
 ) {
-  const assignmentId = String(
-    formData.get("assignment_id") || ""
-  ).trim();
+  const assignmentId =
+    String(
+      formData.get(
+        "assignment_id"
+      ) || ""
+    ).trim();
 
-  const note = String(
-    formData.get("note") || ""
-  ).trim();
+  const note =
+    String(
+      formData.get(
+        "note"
+      ) || ""
+    ).trim();
 
-  if (!assignmentId) {
-    throw new Error("Falta identificar la asignación.");
-  }
+  const result =
+    await respondToAssignmentAction(
+      assignmentId,
+      "change_requested",
+      note
+    );
 
-  if (note.length < 5) {
+  if (!result.success) {
     throw new Error(
-      "Escribe brevemente el motivo por el que necesitas un cambio."
+      result.error ||
+        "No se pudo enviar la solicitud de cambio."
     );
   }
 
-  const { supabase, profile } =
-    await getAuthenticatedProfile();
-
-  const {
-    data: assignment,
-    error: assignmentError,
-  } = await supabase
-    .from("assignments")
-    .select(
-      `
-      id,
-      profile_id,
-      service_plan_id,
-      team_id,
-      status
-      `
-    )
-    .eq("id", assignmentId)
-    .eq("profile_id", profile.id)
-    .maybeSingle();
-
-  if (assignmentError) {
-    throw new Error(
-      `No se pudo consultar la asignación: ${assignmentError.message}`
-    );
-  }
-
-  if (!assignment) {
-    throw new Error(
-      "Esta asignación no existe o no pertenece a tu cuenta."
-    );
-  }
-
-  const { error: updateError } = await supabase
-    .from("assignments")
-    .update({
-      status: "change_requested",
-      note,
-    })
-    .eq("id", assignment.id)
-    .eq("profile_id", profile.id);
-
-  if (updateError) {
-    throw new Error(
-      `No se pudo enviar la solicitud: ${updateError.message}`
-    );
-  }
-
-  revalidatePath("/mi-servicio");
-  revalidatePath("/mi-cuenta");
-  revalidatePath("/admin/servir");
-
-  redirect("/mi-servicio?cambio=1");
+  redirect(
+    "/mi-servicio?cambio=1"
+  );
 }
 
 /* =========================================================
@@ -199,17 +388,25 @@ export async function requestAssignmentChange(
 export async function toggleChecklistItem(
   formData: FormData
 ) {
-  const assignmentId = String(
-    formData.get("assignment_id") || ""
-  ).trim();
+  const assignmentId =
+    String(
+      formData.get(
+        "assignment_id"
+      ) || ""
+    ).trim();
 
-  const item = String(
-    formData.get("item") || ""
-  ).trim();
+  const item =
+    String(
+      formData.get(
+        "item"
+      ) || ""
+    ).trim();
 
   const completed =
     String(
-      formData.get("completed") || ""
+      formData.get(
+        "completed"
+      ) || ""
     ) === "true";
 
   if (!assignmentId) {
@@ -224,50 +421,33 @@ export async function toggleChecklistItem(
     );
   }
 
-  const { supabase, profile } =
-    await getAuthenticatedProfile();
+  const owned =
+    await getOwnedAssignment(
+      assignmentId
+    );
 
-  /*
-   * Comprobamos nuevamente que esta asignación
-   * pertenezca al usuario autenticado.
-   */
+  if (!owned.ok) {
+    throw new Error(
+      owned.error
+    );
+  }
+
   const {
-    data: assignment,
-    error: assignmentError,
-  } = await supabase
-    .from("assignments")
-    .select(
-      `
-      id,
-      profile_id,
-      service_plan_id,
-      team_id
-      `
-    )
-    .eq("id", assignmentId)
-    .eq("profile_id", profile.id)
-    .maybeSingle();
+    supabase,
+    assignment,
+  } = owned;
 
-  if (assignmentError) {
-    throw new Error(
-      `No se pudo validar la asignación: ${assignmentError.message}`
-    );
-  }
+  /* =======================================================
+     REVISAR SI YA EXISTE
+  ======================================================= */
 
-  if (!assignment) {
-    throw new Error(
-      "Esta asignación no existe o no pertenece a tu cuenta."
-    );
-  }
-
-  /*
-   * Revisamos si la tarea ya tiene progreso guardado.
-   */
   const {
     data: existingItem,
     error: existingItemError,
   } = await supabase
-    .from("assignment_checklist")
+    .from(
+      "assignment_checklist"
+    )
     .select(
       `
       id,
@@ -280,7 +460,10 @@ export async function toggleChecklistItem(
       "assignment_id",
       assignment.id
     )
-    .eq("item", item)
+    .eq(
+      "item",
+      item
+    )
     .maybeSingle();
 
   if (existingItemError) {
@@ -289,23 +472,30 @@ export async function toggleChecklistItem(
     );
   }
 
-  /*
-   * Si ya existe, actualizamos.
-   */
+  /* =======================================================
+     ACTUALIZAR
+  ======================================================= */
+
   if (existingItem) {
-    const { error: updateError } =
-      await supabase
-        .from("assignment_checklist")
-        .update({
-          completed,
-          completed_at: completed
-            ? new Date().toISOString()
+    const {
+      error: updateError,
+    } = await supabase
+      .from(
+        "assignment_checklist"
+      )
+      .update({
+        completed,
+
+        completed_at:
+          completed
+            ? new Date()
+                .toISOString()
             : null,
-        })
-        .eq(
-          "id",
-          existingItem.id
-        );
+      })
+      .eq(
+        "id",
+        existingItem.id
+      );
 
     if (updateError) {
       throw new Error(
@@ -313,25 +503,30 @@ export async function toggleChecklistItem(
       );
     }
   } else {
-    /*
-     * Si nunca se había marcado,
-     * creamos el registro.
-     */
-    const { error: insertError } =
-      await supabase
-        .from("assignment_checklist")
-        .insert({
-          assignment_id:
-            assignment.id,
+    /* =====================================================
+       CREAR
+    ====================================================== */
 
-          item,
+    const {
+      error: insertError,
+    } = await supabase
+      .from(
+        "assignment_checklist"
+      )
+      .insert({
+        assignment_id:
+          assignment.id,
 
-          completed,
+        item,
 
-          completed_at: completed
-            ? new Date().toISOString()
+        completed,
+
+        completed_at:
+          completed
+            ? new Date()
+                .toISOString()
             : null,
-        });
+      });
 
     if (insertError) {
       throw new Error(
@@ -340,12 +535,19 @@ export async function toggleChecklistItem(
     }
   }
 
-  /*
-   * Refrescamos Mi servicio.
-   *
-   * También dejamos listo el admin porque
-   * después mostraremos ahí el progreso.
-   */
-  revalidatePath("/mi-servicio");
-  revalidatePath("/admin/servir");
+  /* =======================================================
+     REFRESCAR
+  ======================================================= */
+
+  revalidatePath(
+    "/mi-servicio"
+  );
+
+  revalidatePath(
+    "/"
+  );
+
+  revalidatePath(
+    "/admin/servir"
+  );
 }

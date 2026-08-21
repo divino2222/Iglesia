@@ -103,13 +103,14 @@ export default function PushNotificationsPrompt() {
         "comunidad-vid-install-prompt-dismissed"
       ) === "true";
 
-    const installed =
-      window.matchMedia(
-        "(display-mode: standalone)"
-      ).matches ||
-      // @ts-expect-error Safari standalone
-      window.navigator
-        .standalone === true;
+    const navigatorWithStandalone =
+  window.navigator as Navigator & {
+    standalone?: boolean;
+  };
+
+const installed =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  navigatorWithStandalone.standalone === true;
 
     if (
       installDismissed ||
