@@ -45,14 +45,12 @@ type ChangeRequestCenterProps = {
   assignments: AssignmentRow[];
   profiles: ProfileRow[];
   teams: ServiceTeamRow[];
-  pin: string;
 };
 
 export default function ChangeRequestCenter({
   assignments,
   profiles,
   teams,
-  pin,
 }: ChangeRequestCenterProps) {
   const typedAssignments =
     assignments as ChangeRequestAssignment[];
@@ -539,9 +537,7 @@ export default function ChangeRequestCenter({
                     <Link
                       href={`/admin/assignment/${
                         assignment.id
-                      }?pin=${encodeURIComponent(
-                        pin
-                      )}`}
+                      }`}
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
                     >
                       <ExternalLink
@@ -558,13 +554,7 @@ export default function ChangeRequestCenter({
                     }
                     className="space-y-3 border-t border-white/70 bg-white/60 p-4"
                   >
-                    <input
-                      type="hidden"
-                      name="pin"
-                      value={pin}
-                    />
-
-                    <input
+<input
                       type="hidden"
                       name="assignment_id"
                       value={

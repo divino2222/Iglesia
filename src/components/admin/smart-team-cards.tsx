@@ -18,7 +18,6 @@ type SmartTeamCardsProps = {
   profiles: ProfileRow[];
   assignments: AssignmentRow[];
   planId: string;
-  pin: string;
 };
 
 type AssignedPerson = {
@@ -111,7 +110,6 @@ export default function SmartTeamCards({
   profiles,
   assignments,
   planId,
-  pin,
 }: SmartTeamCardsProps) {
   const profileByName = new Map(
     profiles.map((profile) => [profile.full_name, profile])
@@ -386,9 +384,7 @@ export default function SmartTeamCards({
                 )}
 
                 <Link
-                  href={`/admin/servir?pin=${encodeURIComponent(
-                    pin
-                  )}&plan=${encodeURIComponent(planId)}`}
+                  href={`/admin/servir?plan=${encodeURIComponent(planId)}`}
                   className="block rounded-2xl bg-stone-950 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-stone-800"
                 >
                   Administrar equipo

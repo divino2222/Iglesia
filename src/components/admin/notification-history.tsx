@@ -25,7 +25,6 @@ export type NotificationHistoryRow = {
 
 type NotificationHistoryProps = {
   notifications: NotificationHistoryRow[];
-  pin: string;
 };
 
 type NotificationFilter =
@@ -90,7 +89,6 @@ function formatRelativeTime(date: string) {
 
 export default function NotificationHistory({
   notifications,
-  pin,
 }: NotificationHistoryProps) {
   const [filter, setFilter] =
     useState<NotificationFilter>("all");
@@ -329,7 +327,7 @@ export default function NotificationHistory({
                 key={notification.id}
                 href={`/admin/assignment/${
                   notification.assignment_id
-                }?pin=${encodeURIComponent(pin)}`}
+                }`}
                 className="block"
               >
                 {content}

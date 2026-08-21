@@ -29,12 +29,6 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getServingAdminData } from "@/lib/serving-admin";
 
-type PageProps = {
-  searchParams?: Promise<{
-    pin?: string;
-  }>;
-};
-
 function formatDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   const localDate = new Date(year, month - 1, day);
@@ -61,13 +55,8 @@ function teamStatusLabel(status?: string) {
   return "Pendiente";
 }
 
-export default async function AdminDashboardPage({
-  searchParams,
-}: PageProps) {
-    await requirePermission("dashboard.view");
-
-  const params = await searchParams;
-  const pin = params?.pin ?? "";
+export default async function AdminDashboardPage() {
+  await requirePermission("dashboard.view");
 
   const { plan, teams, assignments, profiles, activities } =
     await getServingAdminData();
@@ -264,9 +253,9 @@ export default async function AdminDashboardPage({
 
         <AdminNotificationListener servicePlanId={plan.id} />
 
-        <PushNotificationManager pin={pin} />
+        <PushNotificationManager />
 
-        <section className="grid grid-cols-3 gap-3">
+<section className="grid grid-cols-3 gap-3">
           <Metric
             number={confirmed.length}
             label="Confirmados"
@@ -309,7 +298,6 @@ export default async function AdminDashboardPage({
           assignments={assignments}
           profiles={profiles}
           teams={teams}
-          pin={pin}
         />
 
         <section className="rounded-[34px] border border-stone-200 bg-white p-5 shadow-sm">
@@ -380,18 +368,14 @@ export default async function AdminDashboardPage({
 
                   {item.response?.id ? (
                     <Link
-                      href={`/admin/assignment/${
-                        item.response.id
-                      }?pin=${encodeURIComponent(pin)}`}
+                      href={`/admin/assignment/${item.response.id}`}
                       className="shrink-0 rounded-full bg-stone-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-stone-800"
                     >
                       Revisar
                     </Link>
                   ) : (
                     <Link
-                      href={`/admin/servir?pin=${encodeURIComponent(
-                        pin
-                      )}&plan=${plan.id}`}
+                      href={`/admin/servir?plan=${plan.id}`}
                       className="shrink-0 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200"
                     >
                       Administrar
@@ -409,9 +393,7 @@ export default async function AdminDashboardPage({
 
             {changes.length + pending.length > 8 ? (
               <Link
-                href={`/admin/servir?pin=${encodeURIComponent(
-                  pin
-                )}&plan=${plan.id}`}
+                href={`/admin/servir?plan=${plan.id}`}
                 className="block rounded-2xl border border-stone-200 bg-white px-4 py-3 text-center text-sm font-semibold text-stone-700"
               >
                 Ver todos los pendientes
@@ -424,7 +406,6 @@ export default async function AdminDashboardPage({
 
         <NotificationHistory
           notifications={notifications}
-          pin={pin}
         />
 
         <SmartTeamCards
@@ -432,20 +413,17 @@ export default async function AdminDashboardPage({
           profiles={profiles}
           assignments={assignments}
           planId={plan.id}
-          pin={pin}
         />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <QuickLink
-            href={`/admin/servir?pin=${encodeURIComponent(
-              pin
-            )}&plan=${plan.id}`}
+            href={`/admin/servir?plan=${plan.id}`}
             label="Administrar"
             icon={<Settings size={22} />}
           />
 
           <QuickLink
-            href={`/admin/personas?pin=${encodeURIComponent(pin)}`}
+            href="/admin/personas"
             label="Personas"
             icon={<UsersRound size={22} />}
           />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatAppDateLong } from "@/lib/date-time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getServingAdminData } from "@/lib/serving-admin";
+import { requirePermission } from "@/lib/auth/permissions";
 import {
   createNextSundayPlan,
   keepAssignmentPending,
@@ -14,7 +15,6 @@ import {
 
 type PageProps = {
   searchParams?: Promise<{
-    pin?: string;
     plan?: string;
   }>;
 };
@@ -59,35 +59,11 @@ function getResponseClass(status?: string) {
 export default async function AdminServirPage({
   searchParams,
 }: PageProps) {
+  await requirePermission("dashboard.view");
+
   const params = await searchParams;
 
-  const pin = params?.pin;
   const selectedPlanId = params?.plan;
-  const validPin = process.env.SERVING_ADMIN_PIN;
-
-  if (!validPin || pin !== validPin) {
-    return (
-      <div className="min-h-screen bg-[#f7f5f0] px-4 py-8">
-        <div className="mx-auto max-w-md rounded-[30px] border border-stone-200 bg-white p-6 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">
-            Panel privado
-          </p>
-
-          <h1 className="mt-2 text-2xl font-semibold text-stone-950">
-            Acceso de coordinador
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            Agrega el PIN al final de la URL para entrar.
-          </p>
-
-          <div className="mt-4 rounded-2xl bg-stone-100 p-3 text-sm text-stone-700">
-            /admin/servir?pin=TU_PIN
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const {
     plan,
@@ -559,10 +535,8 @@ export default async function AdminServirPage({
 
               return (
                 <Link
-                  key={item.id}
-                  href={`/admin/servir?pin=${encodeURIComponent(
-                    pin
-                  )}&plan=${item.id}`}
+  key={item.id}
+  href={`/admin/servir?plan=${item.id}`}
                   className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition ${
                     active
                       ? "border-stone-950 bg-stone-950 text-white"
@@ -615,12 +589,6 @@ export default async function AdminServirPage({
             type="hidden"
             name="plan_id"
             value={plan.id}
-          />
-
-          <input
-            type="hidden"
-            name="admin_pin"
-            value={pin ?? ""}
           />
 
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">
