@@ -38,11 +38,26 @@ type ProfileRow = {
   position_title: string | null;
   ministries: string[] | null;
   is_active: boolean;
+  auth_user_id: string | null;
 };
 
+type AssignmentStatus =
+  | "pending"
+  | "confirmed"
+  | "change_requested";
+
 type AssignmentRow = {
+  id: string;
   team_id: string;
   profile_id: string;
+  status: AssignmentStatus;
+  note: string | null;
+};
+
+type AssignmentDetail = {
+  assignmentId: string;
+  status: AssignmentStatus;
+  note: string | null;
 };
 
 function formatDate(date: string) {
@@ -110,16 +125,20 @@ export default async function ServiceDetailPage({
         full_name,
         position_title,
         ministries,
-        is_active
+        is_active,
+        auth_user_id
       `)
       .eq("is_active", true)
       .order("full_name"),
 
     admin
-      .from("service_assignments")
+      .from("assignments")
       .select(`
+        id,
         team_id,
-        profile_id
+        profile_id,
+        status,
+        note
       `)
       .eq("service_plan_id", id),
   ]);
@@ -156,15 +175,19 @@ export default async function ServiceDetailPage({
     (teamsResult.data ?? []) as TeamRow[];
 
   const profiles =
-    (profilesResult.data ??
-      []) as ProfileRow[];
+    (profilesResult.data ?? []) as ProfileRow[];
 
   const assignments =
-    (assignmentsResult.data ??
-      []) as AssignmentRow[];
+    (assignmentsResult.data ?? []) as AssignmentRow[];
 
   const assignedByTeam =
     new Map<string, string[]>();
+
+  const assignmentDetailsByTeam =
+    new Map<
+      string,
+      Record<string, AssignmentDetail>
+    >();
 
   for (const assignment of assignments) {
     const current =
@@ -179,13 +202,36 @@ export default async function ServiceDetailPage({
         assignment.profile_id,
       ]
     );
+
+    const currentDetails =
+      assignmentDetailsByTeam.get(
+        assignment.team_id
+      ) ?? {};
+
+    assignmentDetailsByTeam.set(
+      assignment.team_id,
+      {
+        ...currentDetails,
+
+        [assignment.profile_id]: {
+          assignmentId:
+            assignment.id,
+
+          status:
+            assignment.status,
+
+          note:
+            assignment.note,
+        },
+      }
+    );
   }
 
   return (
     <main className="min-h-screen bg-[#f7f5f0] px-4 py-6">
       <div className="mx-auto w-full max-w-xl space-y-5">
         <Link
-          href="/coordinacion"
+          href={`/coordinacion?plan=${plan.id}`}
           className="inline-flex items-center gap-2 text-sm font-semibold text-stone-600"
         >
           <ArrowLeft size={17} />
@@ -235,31 +281,52 @@ export default async function ServiceDetailPage({
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-stone-500">
-            Marca los integrantes que participarán
-            en cada ministerio.
+            Las personas ya asignadas aparecen marcadas.
+            También puedes ver quién confirmó, quién está
+            pendiente y quién solicitó un cambio.
           </p>
         </section>
 
         <AssignmentManager
           servicePlanId={plan.id}
-          teams={teams.map((team) => ({
-            id: team.id,
-            teamName: team.team_name,
-            emoji: team.emoji,
-            assignedProfileIds:
-              assignedByTeam.get(
-                team.id
-              ) ?? [],
-          }))}
+          teams={teams.map(
+            (team) => ({
+              id:
+                team.id,
+
+              teamName:
+                team.team_name,
+
+              emoji:
+                team.emoji,
+
+              assignedProfileIds:
+                assignedByTeam.get(
+                  team.id
+                ) ?? [],
+
+              assignmentDetails:
+                assignmentDetailsByTeam.get(
+                  team.id
+                ) ?? {},
+            })
+          )}
           profiles={profiles.map(
             (profile) => ({
-              id: profile.id,
+              id:
+                profile.id,
+
               fullName:
                 profile.full_name,
+
               positionTitle:
                 profile.position_title,
+
               ministries:
                 profile.ministries ?? [],
+
+              authUserId:
+                profile.auth_user_id,
             })
           )}
         />

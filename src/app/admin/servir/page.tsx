@@ -271,7 +271,7 @@ export default async function AdminServirPage({
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Link
+            <a
               href="#confirmaron"
               className="rounded-2xl bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
             >
@@ -282,9 +282,9 @@ export default async function AdminServirPage({
               <p className="text-[11px] font-semibold text-emerald-700">
                 Confirmaron
               </p>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="#sin-responder"
               className="rounded-2xl bg-amber-50 p-3 text-center transition hover:bg-amber-100"
             >
@@ -295,9 +295,9 @@ export default async function AdminServirPage({
               <p className="text-[11px] font-semibold text-amber-700">
                 Sin responder
               </p>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="#pidieron-cambio"
               className="rounded-2xl bg-sky-50 p-3 text-center transition hover:bg-sky-100"
             >
@@ -308,9 +308,9 @@ export default async function AdminServirPage({
               <p className="text-[11px] font-semibold text-sky-700">
                 Cambios solicitados
               </p>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="#listos-para-servir"
               className="rounded-2xl bg-violet-50 p-3 text-center transition hover:bg-violet-100"
             >
@@ -321,7 +321,7 @@ export default async function AdminServirPage({
               <p className="text-[11px] font-semibold text-violet-700">
                 Listos para servir
               </p>
-            </Link>
+            </a>
           </div>
         </section>
 
@@ -349,12 +349,12 @@ export default async function AdminServirPage({
               </span>
             </div>
 
-            <Link
+            <a
               href="#pidieron-cambio"
               className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
             >
               Revisar solicitudes
-            </Link>
+            </a>
           </section>
         ) : (
           <section className="rounded-[30px] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
@@ -398,7 +398,7 @@ export default async function AdminServirPage({
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Link
+            <a
               href="#pidieron-cambio"
               className="rounded-[22px] border border-sky-100 bg-sky-50 p-4 transition hover:bg-sky-100"
             >
@@ -409,9 +409,9 @@ export default async function AdminServirPage({
               <p className="mt-1 text-xs leading-5 text-sky-700/80">
                 {changeRequestedCount} por atender
               </p>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="#sin-responder"
               className="rounded-[22px] border border-amber-100 bg-amber-50 p-4 transition hover:bg-amber-100"
             >
@@ -422,9 +422,9 @@ export default async function AdminServirPage({
               <p className="mt-1 text-xs leading-5 text-amber-700/80">
                 {pendingResponseCount} sin responder
               </p>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="#listos-para-servir"
               className="rounded-[22px] border border-violet-100 bg-violet-50 p-4 transition hover:bg-violet-100"
             >
@@ -435,9 +435,9 @@ export default async function AdminServirPage({
               <p className="mt-1 text-xs leading-5 text-violet-700/80">
                 {readyToServeCount} listos para servir
               </p>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="#crear-proximo-domingo"
               className="rounded-[22px] border border-stone-200 bg-stone-50 p-4 transition hover:bg-stone-100"
             >
@@ -448,7 +448,7 @@ export default async function AdminServirPage({
               <p className="mt-1 text-xs leading-5 text-stone-500">
                 Crear la siguiente planeación
               </p>
-            </Link>
+            </a>
           </div>
         </section>
 
@@ -1345,7 +1345,7 @@ function OperationalList({
   return (
     <div
       id={id}
-      className={`scroll-mt-6 rounded-[26px] border p-4 ${toneClasses.container}`}
+      className={`scroll-mt-24 rounded-[26px] border p-4 ${toneClasses.container}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
