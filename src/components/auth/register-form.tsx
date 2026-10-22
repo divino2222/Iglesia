@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FormEvent,
   useState,
@@ -34,6 +35,8 @@ type RegisterFormProps = {
 export default function RegisterForm({
   ministry = null,
 }: RegisterFormProps) {
+  const router = useRouter();
+
   const [
     fullName,
     setFullName,
@@ -165,6 +168,7 @@ export default function RegisterForm({
         )}`;
 
       const {
+        data,
         error,
       } =
         await supabase.auth.signUp({
@@ -198,6 +202,21 @@ export default function RegisterForm({
         setErrorMessage(
           error.message
         );
+
+        return;
+      }
+
+      /*
+       * Si Supabase no exige confirmar el correo,
+       * signUp ya devuelve una sesión: entramos
+       * directo en lugar de pedir revisar el correo.
+       */
+      if (data.session) {
+        router.replace(
+          nextPath
+        );
+
+        router.refresh();
 
         return;
       }
