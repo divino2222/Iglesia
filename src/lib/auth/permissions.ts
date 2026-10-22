@@ -169,25 +169,47 @@ export async function getCurrentAccess(): Promise<
     return null;
   }
 
-  const {
+  const profileSelect = `
+    id,
+    full_name,
+    email,
+    role_id,
+    ministry_scope,
+    roles (
+      id,
+      name,
+      label
+    )
+  `;
+
+  /*
+   * El vínculo fuerte es auth_user_id.
+   * El email solo se usa para perfiles antiguos
+   * que todavía no tienen cuenta vinculada.
+   */
+  let {
     data: profileData,
     error: profileError,
   } = await admin
     .from("profiles")
-    .select(`
-      id,
-      full_name,
-      email,
-      role_id,
-      ministry_scope,
-      roles (
-        id,
-        name,
-        label
-      )
-    `)
-    .eq("email", user.email)
+    .select(profileSelect)
+    .eq("auth_user_id", user.id)
     .maybeSingle();
+
+  if (!profileError && !profileData) {
+    ({
+      data: profileData,
+      error: profileError,
+    } = await admin
+      .from("profiles")
+      .select(profileSelect)
+      .is("auth_user_id", null)
+      .ilike(
+        "email",
+        user.email.replace(/[\\%_]/g, "\\$&")
+      )
+      .maybeSingle());
+  }
 
   if (profileError) {
     throw new Error(

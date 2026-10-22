@@ -82,7 +82,7 @@ export async function POST(request: Request) {
      */
 
     const { data: server, error: serverError } = await supabase
-      .from("servers")
+      .from("profiles")
       .select("id,full_name,email,auth_user_id")
       .ilike("email", email)
       .maybeSingle();
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: `No encontré un servidor con el correo ${email}.`,
+          error: `No encontré un perfil con el correo ${email}.`,
         },
         { status: 404 }
       );

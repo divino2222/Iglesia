@@ -240,111 +240,7 @@ export async function approveMinistryRequest(
   }
 
   /* =======================================================
-     5. SINCRONIZAR TABLA SERVERS
-     Conservamos compatibilidad con el sistema existente.
-  ======================================================= */
-
-  const {
-    data: existingServer,
-    error: serverLookupError,
-  } = await admin
-    .from("servers")
-    .select(`
-      id,
-      auth_user_id,
-      full_name,
-      phone,
-      photo_url,
-      ministries,
-      is_active
-    `)
-    .eq(
-      "auth_user_id",
-      request.auth_user_id
-    )
-    .maybeSingle();
-
-  if (serverLookupError) {
-    throw new Error(
-      `No se pudo consultar servidores: ${serverLookupError.message}`
-    );
-  }
-
-  if (existingServer) {
-    const currentServerMinistries =
-      Array.isArray(
-        existingServer.ministries
-      )
-        ? existingServer.ministries
-        : [];
-
-    const updatedServerMinistries = [
-      ...new Set([
-        ...currentServerMinistries,
-        ministry.name,
-      ]),
-    ];
-
-    const {
-      error: updateServerError,
-    } = await admin
-      .from("servers")
-      .update({
-        full_name:
-          profile.full_name,
-
-        phone:
-          profile.phone,
-
-        photo_url:
-          profile.photo_url,
-
-        ministries:
-          updatedServerMinistries,
-
-        is_active: true,
-      })
-      .eq("id", existingServer.id);
-
-    if (updateServerError) {
-      throw new Error(
-        `No se pudo actualizar el servidor: ${updateServerError.message}`
-      );
-    }
-  } else {
-    const {
-      error: insertServerError,
-    } = await admin
-      .from("servers")
-      .insert({
-        auth_user_id:
-          request.auth_user_id,
-
-        full_name:
-          profile.full_name,
-
-        phone:
-          profile.phone,
-
-        photo_url:
-          profile.photo_url,
-
-        ministries: [
-          ministry.name,
-        ],
-
-        is_active: true,
-      });
-
-    if (insertServerError) {
-      throw new Error(
-        `No se pudo crear el servidor: ${insertServerError.message}`
-      );
-    }
-  }
-
-  /* =======================================================
-     6. APROBAR SOLICITUD
+     5. APROBAR SOLICITUD
   ======================================================= */
 
   const reviewedAt =
@@ -376,7 +272,7 @@ export async function approveMinistryRequest(
   }
 
   /* =======================================================
-     7. ACTUALIZAR PANTALLAS
+     6. ACTUALIZAR PANTALLAS
   ======================================================= */
 
   revalidateMinistryRequestPaths(
