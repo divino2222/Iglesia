@@ -12,7 +12,8 @@ export type RoleName =
   | "team_leader"
   | "server"
   | "pastor"
-  | "new_volunteer";
+  | "new_volunteer"
+  | "member";
 
 export type PermissionName =
   | "dashboard.view"
@@ -104,7 +105,8 @@ function isRoleName(value: string): value is RoleName {
     value === "team_leader" ||
     value === "server" ||
     value === "pastor" ||
-    value === "new_volunteer"
+    value === "new_volunteer" ||
+    value === "member"
   );
 }
 
@@ -498,6 +500,7 @@ export function getDefaultRoute(
       return "/mi-servicio";
 
     case "new_volunteer":
+    case "member":
       return "/perfil";
 
     default:

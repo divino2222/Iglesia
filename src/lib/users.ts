@@ -79,7 +79,8 @@ function isRoleName(value: string): value is RoleName {
     value === "team_leader" ||
     value === "server" ||
     value === "pastor" ||
-    value === "new_volunteer"
+    value === "new_volunteer" ||
+    value === "member"
   );
 }
 

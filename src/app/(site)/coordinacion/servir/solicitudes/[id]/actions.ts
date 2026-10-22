@@ -209,12 +209,13 @@ export async function approveMinistryRequest(
   ];
 
   /*
-   * Solo convertimos new_volunteer a server.
-   * No tocamos pastor, coordinator,
+   * Solo convertimos new_volunteer y member
+   * a server. No tocamos pastor, coordinator,
    * ministry_leader, etc.
    */
   const nextRole =
-    profile.role === "new_volunteer"
+    profile.role === "new_volunteer" ||
+    profile.role === "member"
       ? "server"
       : profile.role;
 

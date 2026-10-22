@@ -16,6 +16,7 @@ const validRoleNames: RoleName[] = [
   "server",
   "pastor",
   "new_volunteer",
+  "member",
 ];
 
 function isValidRoleName(

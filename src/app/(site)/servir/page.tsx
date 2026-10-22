@@ -289,8 +289,10 @@ export default async function ServirPage() {
         ================================================= */}
 
         {user &&
-        profile?.role ===
-          "new_volunteer" ? (
+        (profile?.role ===
+          "new_volunteer" ||
+          profile?.role ===
+            "member") ? (
           <section className="rounded-[28px] border border-emerald-100 bg-emerald-50 p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white">
