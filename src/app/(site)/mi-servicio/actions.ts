@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getCurrentAccess } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { sendCoordinatorPush } from "@/lib/push/send-coordinator-push";
 
@@ -41,6 +42,21 @@ async function getAuthenticatedProfile() {
       ok: false as const,
       error:
         "Debes iniciar sesión.",
+    };
+  }
+
+  const access =
+    await getCurrentAccess();
+
+  if (
+    !access?.permissions.includes(
+      "own_assignments.respond"
+    )
+  ) {
+    return {
+      ok: false as const,
+      error:
+        "No tienes permiso para responder asignaciones.",
     };
   }
 

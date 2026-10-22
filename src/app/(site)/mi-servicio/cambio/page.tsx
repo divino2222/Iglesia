@@ -5,6 +5,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { requestAssignmentChange } from "../actions";
 
@@ -42,6 +43,8 @@ function formatDate(
 export default async function SolicitarCambioPage({
   searchParams,
 }: PageProps) {
+  await requirePermission("own_assignments.view");
+
   const params =
     await searchParams;
 
