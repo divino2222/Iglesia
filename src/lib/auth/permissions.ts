@@ -169,6 +169,15 @@ export async function getCurrentAccess(): Promise<
     return null;
   }
 
+  /*
+   * SEGURIDAD:
+   * El perfil se identifica por el ID de la cuenta
+   * (auth_user_id), nunca por el correo. Buscar por
+   * correo permitía heredar el rol de un perfil sin
+   * cuenta registrándose con su correo.
+   *
+   * Un perfil inactivo no tiene acceso.
+   */
   const {
     data: profileData,
     error: profileError,
@@ -186,7 +195,8 @@ export async function getCurrentAccess(): Promise<
         label
       )
     `)
-    .eq("email", user.email)
+    .eq("auth_user_id", user.id)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (profileError) {

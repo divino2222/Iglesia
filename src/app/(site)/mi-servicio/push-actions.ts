@@ -21,14 +21,14 @@ async function getAuthenticatedProfile() {
     error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user?.email) {
+  if (userError || !user) {
     throw new Error("No hay una sesión activa.");
   }
 
   const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("id, full_name, email")
-    .eq("email", user.email)
+    .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (profileError) {

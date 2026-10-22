@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requirePermission } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logActivity } from "@/lib/activity-log";
 
@@ -37,6 +38,8 @@ function revalidateProfilePaths() {
 }
 
 export async function createProfile(formData: FormData) {
+  await requirePermission("users.manage");
+
   const supabase = createAdminClient();
 
   const fullName = String(formData.get("full_name") || "").trim();
@@ -120,6 +123,8 @@ export async function createProfile(formData: FormData) {
 }
 
 export async function updateProfile(formData: FormData) {
+  await requirePermission("users.manage");
+
   const supabase = createAdminClient();
 
   const id = String(formData.get("id") || "").trim();

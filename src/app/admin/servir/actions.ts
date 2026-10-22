@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendUserPush } from "@/lib/push/send-user-push";
 
@@ -35,6 +36,8 @@ function getNextSundayDate(date: string) {
 ========================================================= */
 
 export async function updateServicePlan(formData: FormData) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const id = String(formData.get("id") || "");
@@ -92,6 +95,8 @@ export async function updateServicePlan(formData: FormData) {
 export async function updateServiceTeam(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const id = String(formData.get("id") || "");
@@ -340,6 +345,13 @@ export async function updateServiceTeam(
 export async function linkProfileAccount(
   formData: FormData
 ) {
+  /*
+   * Vincular una cuenta con un perfil equivale a
+   * otorgarle el rol de ese perfil: solo quien
+   * administra usuarios puede hacerlo.
+   */
+  await requirePermission("users.manage");
+
   const supabase = createAdminClient();
 
   const profileId = String(
@@ -424,6 +436,8 @@ export async function linkProfileAccount(
 export async function keepAssignmentPending(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const assignmentId = String(
@@ -457,6 +471,8 @@ export async function keepAssignmentPending(
 export async function resolveAssignmentChange(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const assignmentId = String(
@@ -491,6 +507,8 @@ export async function resolveAssignmentChange(
 export async function reassignAssignment(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const assignmentId = String(
@@ -683,34 +701,17 @@ export async function reassignAssignment(
 export async function createNextSundayPlan(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const currentPlanId = String(
     formData.get("plan_id") || ""
   );
 
-  const adminPin = String(
-    formData.get("admin_pin") || ""
-  );
-
   if (!currentPlanId) {
     throw new Error(
       "No se recibió el plan actual."
-    );
-  }
-
-  /*
-   * Validamos el PIN porque esta acción
-   * crea información nueva.
-   */
-
-  if (
-    !process.env.SERVING_ADMIN_PIN ||
-    adminPin !==
-      process.env.SERVING_ADMIN_PIN
-  ) {
-    throw new Error(
-      "No autorizado para crear un nuevo domingo."
     );
   }
 
@@ -774,9 +775,7 @@ export async function createNextSundayPlan(
     revalidateServingPaths();
 
     redirect(
-      `/admin/servir?pin=${encodeURIComponent(
-        adminPin
-      )}&plan=${encodeURIComponent(
+      `/admin/servir?plan=${encodeURIComponent(
         existingPlan.id
       )}`
     );
@@ -924,9 +923,7 @@ export async function createNextSundayPlan(
    */
 
   redirect(
-    `/admin/servir?pin=${encodeURIComponent(
-      adminPin
-    )}&plan=${encodeURIComponent(
+    `/admin/servir?plan=${encodeURIComponent(
       newPlan.id
     )}`
   );

@@ -1,12 +1,7 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth/permissions";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createProfile, updateProfile } from "./actions";
-
-type PageProps = {
-  searchParams?: Promise<{
-    pin?: string;
-  }>;
-};
 
 type ProfileRow = {
   id: string;
@@ -19,40 +14,14 @@ type ProfileRow = {
   is_active: boolean;
 };
 
-export default async function AdminPersonasPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const pin = params?.pin;
-  const validPin = process.env.SERVING_ADMIN_PIN;
+export default async function AdminPersonasPage() {
+  await requirePermission("users.manage");
 
-  if (!validPin || pin !== validPin) {
-    return (
-      <div className="min-h-screen bg-[#f7f5f0] px-4 py-8">
-        <div className="mx-auto max-w-md rounded-[30px] border border-stone-200 bg-white p-6 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">
-            Panel privado
-          </p>
-
-          <h1 className="mt-2 text-2xl font-semibold text-stone-950">
-            Acceso de coordinador
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            Agrega el PIN al final de la URL para entrar.
-          </p>
-
-          <div className="mt-4 rounded-2xl bg-stone-100 p-3 text-sm text-stone-700">
-            /admin/personas?pin=TU_PIN
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id, full_name, email, phone, photo_url, role, ministries, is_active")
     .order("full_name", { ascending: true });
 
   const profiles = (data ?? []) as ProfileRow[];
@@ -76,7 +45,7 @@ export default async function AdminPersonasPage({ searchParams }: PageProps) {
 
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
-              href={`/admin/servir?pin=${encodeURIComponent(pin || "")}`}
+              href="/admin/servir"
               className="rounded-2xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white"
             >
               Volver a Servir
