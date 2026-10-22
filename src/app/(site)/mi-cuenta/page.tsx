@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import LogoutButton from "@/components/auth/logout-button";
+import { getCurrentAccess } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function MiCuentaPage() {
@@ -59,6 +60,16 @@ export default async function MiCuentaPage() {
       `No se pudo cargar tu perfil: ${profileError.message}`
     );
   }
+
+  /* =========================================================
+     ¿PUEDE SERVIR?
+     Un "member" tiene perfil pero todavía no asignaciones.
+  ========================================================= */
+
+  const access = await getCurrentAccess();
+
+  const canServe =
+    access?.permissions.includes("own_assignments.view") ?? false;
 
   /* =========================================================
      NOMBRE A MOSTRAR
@@ -164,11 +175,15 @@ export default async function MiCuentaPage() {
                 </p>
 
                 <h2 className="mt-1 text-xl font-semibold text-stone-950">
-                  Servidor de Comunidad VID
+                  {canServe
+                    ? "Servidor de Comunidad VID"
+                    : "Miembro de Comunidad VID"}
                 </h2>
 
                 <p className="mt-2 text-sm leading-6 text-stone-600">
-                  Tu cuenta ya está relacionada con tu perfil de servicio.
+                  {canServe
+                    ? "Tu cuenta ya está relacionada con tu perfil de servicio."
+                    : "Ya eres parte de Comunidad VID. Si quieres servir, envía tu solicitud desde Servir."}
                 </p>
 
                 {Array.isArray(profile.ministries) &&
@@ -216,7 +231,7 @@ export default async function MiCuentaPage() {
             MI SERVICIO
         ====================================================== */}
 
-        {profile ? (
+        {profile && canServe ? (
           <Link
             href="/mi-servicio"
             className="group block rounded-[30px] border border-emerald-100 bg-white p-5 shadow-sm transition hover:border-emerald-200"

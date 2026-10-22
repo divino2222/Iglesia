@@ -7,6 +7,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { confirmAssignment } from "../actions";
 
@@ -44,6 +45,8 @@ function formatDate(
 export default async function ConfirmarServicioPage({
   searchParams,
 }: PageProps) {
+  await requirePermission("own_assignments.view");
+
   const params =
     await searchParams;
 

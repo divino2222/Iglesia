@@ -15,6 +15,7 @@ import {
   getAppTodayString,
 } from "@/lib/date-time";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import PersonalChecklistItem from "@/components/serving/personal-checklist-item";
 
@@ -74,6 +75,8 @@ function getCompactStatusClasses(
 ========================================================= */
 
 export default async function MiServicioPage() {
+  await requirePermission("own_assignments.view");
+
   const supabase = await createClient();
 
   /* =========================================================

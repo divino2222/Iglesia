@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { formatAppDateLong } from "@/lib/date-time";
 import PersonalChecklistItem from "@/components/serving/personal-checklist-item";
@@ -65,6 +66,8 @@ function getStatusClasses(
 export default async function MiServicioDetallePage({
   params,
 }: PageProps) {
+  await requirePermission("own_assignments.view");
+
   const { id } = await params;
 
   if (!id) {
