@@ -499,11 +499,15 @@ export function getDefaultRoute(
     case "server":
       return "/mi-servicio";
 
+    /*
+     * /mi-cuenta es el inicio de quien todavía no sirve
+     * (igual que al terminar el registro).
+     */
     case "new_volunteer":
     case "member":
-      return "/perfil";
+      return "/mi-cuenta";
 
     default:
-      return "/perfil";
+      return "/mi-cuenta";
   }
 }

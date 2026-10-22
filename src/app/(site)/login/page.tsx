@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 
 import LoginForm from "@/components/auth/login-form";
+import {
+  getCurrentAccess,
+  getDefaultRoute,
+} from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
@@ -10,6 +14,10 @@ type PageProps = {
   }>;
 };
 
+/*
+ * Devuelve null si no hay un destino interno válido;
+ * en ese caso se usa la ruta inicial según el rol.
+ */
 function getSafeNextPath(
   next?: string | null
 ) {
@@ -18,7 +26,7 @@ function getSafeNextPath(
     !next.startsWith("/") ||
     next.startsWith("//")
   ) {
-    return "/mi-cuenta";
+    return null;
   }
 
   return next;
@@ -51,10 +59,23 @@ export default async function LoginPage({
    * /login?next=/servir/solicitud?ministerio=alabanza
    *
    * irá directamente a esa solicitud.
+   *
+   * Sin destino, va a la ruta inicial de su rol.
    */
   if (user) {
+    if (nextPath) {
+      redirect(
+        nextPath
+      );
+    }
+
+    const access =
+      await getCurrentAccess();
+
     redirect(
-      nextPath
+      access
+        ? getDefaultRoute(access)
+        : "/mi-cuenta"
     );
   }
 
@@ -81,7 +102,7 @@ export default async function LoginPage({
               Inicia sesión para continuar dentro de Comunidad VID.
             </p>
 
-            {nextPath.startsWith(
+            {nextPath?.startsWith(
               "/servir/solicitud"
             ) ? (
               <div className="mt-5 rounded-[22px] bg-white/10 p-4">
