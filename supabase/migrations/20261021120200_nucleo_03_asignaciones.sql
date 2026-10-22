@@ -59,17 +59,6 @@ begin
 end
 $$;
 
-create temporary table _counts on commit drop as
-select
-  (select count(*) from public.service_assignments) as sa_before,
-  (select count(*) from public.assignments)         as a_total,
-  (select count(*) from public.assignments a
-     join public.service_assignments s
-       on s.service_plan_id = a.service_plan_id
-      and s.team_id = a.team_id
-      and s.profile_id = a.profile_id)              as overlap,
-  (select count(*) from public.assignment_checklist) as checklist_total;
-
 -- Detalle de las filas duplicadas y qué estado va a ganar
 select a.id as id_assignments, s.id as id_service_assignments,
        a.status as status_assignments, s.status as status_service_assignments,
@@ -151,32 +140,46 @@ where not exists (
 -- 4) Nueva FK del checklist (falla si queda algún checklist huérfano)
 -- ---------------------------------------------------------------------
 alter table public.assignment_checklist
+  drop constraint if exists assignment_checklist_assignment_id_fkey;
+
+alter table public.assignment_checklist
   add constraint assignment_checklist_assignment_id_fkey
   foreign key (assignment_id) references public.service_assignments (id)
   on delete cascade;
 
 -- ---------------------------------------------------------------------
--- 5) Verificación de conteos
+-- 5) Verificación (sin estado: se puede ejecutar sola o repetir)
+--    · Ninguna fila de assignments quedó sin su equivalente.
+--    · Ningún checklist quedó huérfano (la FK del paso 4 ya lo exige).
 -- ---------------------------------------------------------------------
 do $$
 declare
-  c        record;
-  v_after  int := (select count(*) from public.service_assignments);
-  v_checks int := (select count(*) from public.assignment_checklist);
+  v_missing int;
+  v_orphan  int;
 begin
-  select * into c from _counts;
+  select count(*) into v_missing
+  from public.assignments a
+  where not exists (
+    select 1 from public.service_assignments s
+    where s.service_plan_id = a.service_plan_id
+      and s.team_id = a.team_id
+      and s.profile_id = a.profile_id
+  );
 
-  if v_after <> c.sa_before + c.a_total - c.overlap then
-    raise exception 'service_assignments tiene % filas; se esperaban % (% + % - %)',
-      v_after, c.sa_before + c.a_total - c.overlap, c.sa_before, c.a_total, c.overlap;
+  if v_missing > 0 then
+    raise exception '% filas de assignments no llegaron a service_assignments', v_missing;
   end if;
 
-  if v_checks <> c.checklist_total then
-    raise exception 'assignment_checklist cambió de % a % filas', c.checklist_total, v_checks;
+  select count(*) into v_orphan
+  from public.assignment_checklist c
+  where not exists (select 1 from public.service_assignments s where s.id = c.assignment_id);
+
+  if v_orphan > 0 then
+    raise exception '% filas de assignment_checklist sin asignación', v_orphan;
   end if;
 
-  raise notice 'service_assignments: % → % filas (% copiadas, % duplicadas resueltas)',
-    c.sa_before, v_after, c.a_total - c.overlap, c.overlap;
+  raise notice 'service_assignments: % filas, todas las de assignments incluidas',
+    (select count(*) from public.service_assignments);
 end
 $$;
 
