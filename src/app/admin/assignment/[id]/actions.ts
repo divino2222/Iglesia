@@ -296,19 +296,6 @@ export async function reviewAssignment(
 
   const admin = createAdminClient();
 
-  const pin = String(
-    formData.get("pin") || ""
-  ).trim();
-
-  const validPin =
-    process.env.SERVING_ADMIN_PIN;
-
-  if (!validPin || pin !== validPin) {
-    throw new Error(
-      "No tienes autorización para realizar esta acción."
-    );
-  }
-
   const assignmentId = String(
     formData.get("assignment_id") || ""
   ).trim();
@@ -1412,9 +1399,5 @@ export async function reviewAssignment(
     assignmentId
   );
 
-  redirect(
-    `/admin?pin=${encodeURIComponent(
-      pin
-    )}`
-  );
+  redirect("/admin");
 }

@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/auth/permissions";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendUserPush } from "@/lib/push/send-user-push";
 
 /* =========================================================
@@ -346,7 +346,12 @@ export async function updateServiceTeam(
 export async function linkProfileAccount(
   formData: FormData
 ) {
-  await requirePermission("dashboard.view");
+  /*
+   * Vincular una cuenta con un perfil equivale a
+   * otorgarle el rol de ese perfil: solo quien
+   * administra usuarios puede hacerlo.
+   */
+  await requirePermission("users.manage");
 
   const supabase = createAdminClient();
 

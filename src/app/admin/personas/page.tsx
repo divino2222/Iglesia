@@ -21,7 +21,7 @@ export default async function AdminPersonasPage() {
 
   const { data } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id, full_name, email, phone, photo_url, role, ministries, is_active")
     .order("full_name", { ascending: true });
 
   const profiles = (data ?? []) as ProfileRow[];

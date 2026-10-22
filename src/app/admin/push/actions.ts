@@ -1,5 +1,6 @@
 "use server";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type PushSubscriptionInput = {
@@ -11,22 +12,11 @@ type PushSubscriptionInput = {
   };
 };
 
-function verifyAdminPin(pin: string) {
-  const validPin = process.env.SERVING_ADMIN_PIN;
-
-  if (!validPin || pin !== validPin) {
-    throw new Error(
-      "No tienes autorización para administrar notificaciones."
-    );
-  }
-}
-
 export async function saveAdminPushSubscription(
-  pin: string,
   subscription: PushSubscriptionInput,
   userAgent: string
 ) {
-  verifyAdminPin(pin);
+  await requirePermission("settings.manage");
 
   if (!subscription.endpoint) {
     throw new Error("La suscripción no contiene un endpoint válido.");
@@ -67,10 +57,9 @@ export async function saveAdminPushSubscription(
 }
 
 export async function disableAdminPushSubscription(
-  pin: string,
   endpoint: string
 ) {
-  verifyAdminPin(pin);
+  await requirePermission("settings.manage");
 
   if (!endpoint) {
     throw new Error(

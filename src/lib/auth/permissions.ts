@@ -169,47 +169,35 @@ export async function getCurrentAccess(): Promise<
     return null;
   }
 
-  const profileSelect = `
-    id,
-    full_name,
-    email,
-    role_id,
-    ministry_scope,
-    roles (
-      id,
-      name,
-      label
-    )
-  `;
-
   /*
-   * El vínculo fuerte es auth_user_id.
-   * El email solo se usa para perfiles antiguos
-   * que todavía no tienen cuenta vinculada.
+   * SEGURIDAD:
+   * El perfil se identifica por el ID de la cuenta
+   * (auth_user_id), nunca por el correo. Buscar por
+   * correo permitía heredar el rol de un perfil sin
+   * cuenta registrándose con su correo.
+   *
+   * Un perfil inactivo no tiene acceso.
    */
-  let {
+  const {
     data: profileData,
     error: profileError,
   } = await admin
     .from("profiles")
-    .select(profileSelect)
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-
-  if (!profileError && !profileData) {
-    ({
-      data: profileData,
-      error: profileError,
-    } = await admin
-      .from("profiles")
-      .select(profileSelect)
-      .is("auth_user_id", null)
-      .ilike(
-        "email",
-        user.email.replace(/[\\%_]/g, "\\$&")
+    .select(`
+      id,
+      full_name,
+      email,
+      role_id,
+      ministry_scope,
+      roles (
+        id,
+        name,
+        label
       )
-      .maybeSingle());
-  }
+    `)
+    .eq("auth_user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
 
   if (profileError) {
     throw new Error(
