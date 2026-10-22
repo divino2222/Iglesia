@@ -28,10 +28,6 @@ type PageProps = {
   params: Promise<{
     id: string;
   }>;
-
-  searchParams?: Promise<{
-    pin?: string;
-  }>;
 };
 
 type ResolutionAction =
@@ -146,21 +142,12 @@ function toMetadata(
 
 export default async function AssignmentPage({
   params,
-  searchParams,
 }: PageProps) {
   await requirePermission(
     "change_requests.manage"
   );
 
   const { id } = await params;
-  const query = await searchParams;
-
-  /*
-   * Conservamos el PIN por compatibilidad temporal con
-   * los enlaces y Server Actions actuales.
-   * La autorización real ya se valida mediante permisos.
-   */
-  const pin = query?.pin ?? "";
 
   const uuidPattern =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -436,7 +423,7 @@ export default async function AssignmentPage({
     <main className="min-h-screen bg-[#f7f5f0] px-4 py-6">
       <div className="mx-auto max-w-3xl space-y-6">
         <Link
-          href={`/admin?pin=${encodeURIComponent(pin)}`}
+          href="/admin"
           className="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 transition hover:text-stone-950"
         >
           <ArrowLeft size={17} />
@@ -673,12 +660,6 @@ export default async function AssignmentPage({
           action={reviewAssignment}
           className="space-y-5 rounded-[34px] border border-stone-200 bg-white p-5 shadow-sm"
         >
-          <input
-            type="hidden"
-            name="pin"
-            value={pin}
-          />
-
           <input
             type="hidden"
             name="assignment_id"

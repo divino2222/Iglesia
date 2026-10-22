@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Eye,
   MessageCircle,
   ShieldCheck,
   UsersRound,
@@ -16,6 +17,10 @@ import {
 
 import { createClient } from "@/lib/supabase/server";
 import PersonalChecklistItem from "@/components/serving/personal-checklist-item";
+
+/* =========================================================
+   TIPOS
+========================================================= */
 
 type AssignmentStatus =
   | "pending"
@@ -50,12 +55,19 @@ function getStatusClasses(status: AssignmentStatus) {
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
-/* =========================================================
-   FECHAS
-========================================================= */
+function getCompactStatusClasses(
+  status: AssignmentStatus
+) {
+  if (status === "confirmed") {
+    return "bg-emerald-100 text-emerald-700";
+  }
 
+  if (status === "change_requested") {
+    return "bg-red-100 text-red-700";
+  }
 
-
+  return "bg-amber-100 text-amber-700";
+}
 
 /* =========================================================
    PÁGINA
@@ -129,8 +141,9 @@ export default async function MiServicioPage() {
               </h1>
 
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                Coordinación debe relacionar tu cuenta con tu perfil de
-                servidor antes de mostrar tus asignaciones.
+                Coordinación debe relacionar tu cuenta con tu
+                perfil de servidor antes de mostrar tus
+                asignaciones.
               </p>
             </div>
           </div>
@@ -200,7 +213,7 @@ export default async function MiServicioPage() {
   }
 
   /* =========================================================
-     PRÓXIMA ASIGNACIÓN
+     TODAS LAS ASIGNACIONES FUTURAS
   ========================================================= */
 
   const futureAssignments = (
@@ -231,17 +244,26 @@ export default async function MiServicioPage() {
         ? b.service_plans[0]
         : b.service_plans;
 
-      return String(
+      const dateCompare = String(
         planA?.service_date || ""
       ).localeCompare(
-        String(
-          planB?.service_date || ""
-        )
+        String(planB?.service_date || "")
+      );
+
+      if (dateCompare !== 0) {
+        return dateCompare;
+      }
+
+      return String(a.id).localeCompare(
+        String(b.id)
       );
     });
 
   const nextAssignment =
     futureAssignments[0];
+
+  const laterAssignments =
+    futureAssignments.slice(1);
 
   /* =========================================================
      SIN ASIGNACIÓN
@@ -261,7 +283,8 @@ export default async function MiServicioPage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-white/70">
-              Aquí aparecerán tus próximos servicios en Comunidad VID.
+              Aquí aparecerán tus próximos servicios en
+              Comunidad VID.
             </p>
           </div>
 
@@ -276,8 +299,8 @@ export default async function MiServicioPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                Cuando coordinación te asigne a un próximo servicio,
-                aparecerá automáticamente aquí.
+                Cuando coordinación te asigne a un próximo
+                servicio, aparecerá automáticamente aquí.
               </p>
             </div>
           </div>
@@ -294,7 +317,7 @@ export default async function MiServicioPage() {
   }
 
   /* =========================================================
-     PLAN + EQUIPO
+     PLAN + EQUIPO PRINCIPAL
   ========================================================= */
 
   const plan = Array.isArray(
@@ -319,7 +342,7 @@ export default async function MiServicioPage() {
     nextAssignment.status as AssignmentStatus;
 
   /* =========================================================
-     CHECKLIST PERSONAL DEL SERVIDOR
+     CHECKLIST PERSONAL DEL PRÓXIMO SERVICIO
   ========================================================= */
 
   const {
@@ -346,12 +369,6 @@ export default async function MiServicioPage() {
     );
   }
 
-  /*
-   * Creamos un mapa:
-   *
-   * "Confirmar canciones" => true
-   * "Revisar instrumentos" => false
-   */
   const completedChecklist =
     new Map<string, boolean>(
       (checklistProgress ?? []).map(
@@ -384,15 +401,15 @@ export default async function MiServicioPage() {
 
   return (
     <div className="space-y-5 px-4 py-6 pb-28">
+
       {/* =====================================================
-          CABECERA / ASIGNACIÓN
+          CABECERA / PRÓXIMO SERVICIO
       ====================================================== */}
 
       <section className="overflow-hidden rounded-[34px] border border-stone-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.08)]">
         <div className="bg-gradient-to-br from-stone-950 via-stone-900 to-stone-800 px-5 py-7 text-white">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
             <ShieldCheck size={13} />
-
             Mi próximo servicio
           </div>
 
@@ -403,9 +420,16 @@ export default async function MiServicioPage() {
           <p className="mt-2 text-sm leading-6 text-white/70">
             Esta es tu próxima asignación en Comunidad VID.
           </p>
+
+          {futureAssignments.length > 1 ? (
+            <div className="mt-4 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">
+              Tienes {futureAssignments.length} servicios programados
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-4 p-5">
+
           {/* FECHA */}
 
           <div className="rounded-[28px] border border-stone-100 bg-stone-50 p-4">
@@ -420,7 +444,9 @@ export default async function MiServicioPage() {
                 </p>
 
                 <p className="mt-1 text-lg font-semibold text-stone-950">
-                  {formatAppDateLong(plan.service_date)}
+                  {formatAppDateLong(
+                    plan.service_date
+                  )}
                 </p>
 
                 <p className="mt-1 text-sm text-stone-600">
@@ -515,15 +541,22 @@ export default async function MiServicioPage() {
             ) : null}
           </div>
 
-          {/* =================================================
-              ACCIONES
-          ================================================= */}
+          {/* VER DETALLE */}
+
+          <Link
+            href={`/mi-servicio/${nextAssignment.id}`}
+            className="flex w-full items-center justify-center gap-2 rounded-[22px] bg-stone-950 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800"
+          >
+            <Eye size={18} />
+            Ver mi servicio
+          </Link>
+
+          {/* ACCIONES */}
 
           <div className="space-y-3 pt-1">
             {status === "confirmed" ? (
               <div className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
                 <CheckCircle2 size={18} />
-
                 Asistencia confirmada
               </div>
             ) : (
@@ -532,7 +565,6 @@ export default async function MiServicioPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-[22px] bg-emerald-600 px-5 py-4 text-sm font-semibold text-white shadow-[0_12px_25px_rgba(5,150,105,0.22)] transition hover:bg-emerald-700"
               >
                 <CheckCircle2 size={18} />
-
                 Confirmar que asistiré
               </Link>
             )}
@@ -553,7 +585,202 @@ export default async function MiServicioPage() {
       </section>
 
       {/* =====================================================
-          CHECKLIST PERSONAL
+          PRÓXIMOS SERVICIOS
+      ====================================================== */}
+
+      {laterAssignments.length > 0 ? (
+        <section className="rounded-[34px] border border-stone-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">
+            Agenda personal
+          </p>
+
+          <div className="mt-1 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-stone-950">
+                Próximos servicios
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-stone-500">
+                Revisa y confirma cada asignación por separado.
+              </p>
+            </div>
+
+            <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">
+              {laterAssignments.length}
+            </span>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {laterAssignments.map(
+              (assignment) => {
+                const laterPlan =
+                  Array.isArray(
+                    assignment.service_plans
+                  )
+                    ? assignment
+                        .service_plans[0]
+                    : assignment.service_plans;
+
+                const laterTeam =
+                  Array.isArray(
+                    assignment.service_teams
+                  )
+                    ? assignment
+                        .service_teams[0]
+                    : assignment.service_teams;
+
+                if (
+                  !laterPlan ||
+                  !laterTeam
+                ) {
+                  return null;
+                }
+
+                const laterStatus =
+                  assignment.status as AssignmentStatus;
+
+                return (
+                  <article
+                    key={assignment.id}
+                    className="overflow-hidden rounded-[28px] border border-stone-200 bg-stone-50"
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-lg shadow-sm">
+                            {laterTeam.emoji ||
+                              "🤝"}
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                              {formatAppDateLong(
+                                laterPlan.service_date
+                              )}
+                            </p>
+
+                            <h3 className="mt-1 text-lg font-semibold text-stone-950">
+                              {
+                                laterTeam.team_name
+                              }
+                            </h3>
+
+                            <p className="mt-1 text-sm text-stone-500">
+                              Llegada:{" "}
+                              {laterTeam.arrival_time ||
+                                "Por confirmar"}
+                              {" · "}
+                              Servicio:{" "}
+                              {laterTeam.service_time ||
+                                laterPlan.service_time}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${getCompactStatusClasses(
+                            laterStatus
+                          )}`}
+                        >
+                          {laterStatus ===
+                          "confirmed"
+                            ? "Confirmado"
+                            : laterStatus ===
+                                "change_requested"
+                              ? "Cambio solicitado"
+                              : "Pendiente"}
+                        </span>
+                      </div>
+
+                      {laterTeam.leader_name ? (
+                        <p className="mt-3 text-xs text-stone-500">
+                          Responsable:{" "}
+                          {
+                            laterTeam.leader_name
+                          }
+                        </p>
+                      ) : null}
+
+                      {assignment.note ? (
+                        <div className="mt-3 rounded-2xl bg-white p-3 text-xs leading-5 text-stone-600">
+                          {assignment.note}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="border-t border-stone-200 bg-white p-3">
+
+                      {/* VER SERVICIO */}
+
+                      <Link
+                        href={`/mi-servicio/${assignment.id}`}
+                        className="mb-2 flex w-full items-center justify-center gap-2 rounded-[18px] bg-stone-950 px-4 py-3 text-xs font-semibold text-white transition hover:bg-stone-800"
+                      >
+                        <Eye size={15} />
+                        Ver mi servicio
+                      </Link>
+
+                      {/* ACCIONES */}
+
+                      {laterStatus ===
+                      "confirmed" ? (
+                        <div className="flex items-center justify-center gap-2 rounded-[18px] bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                          <CheckCircle2
+                            size={17}
+                          />
+                          Asistencia confirmada
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Link
+                            href={`/mi-servicio/confirmar?id=${assignment.id}`}
+                            className="flex items-center justify-center gap-1.5 rounded-[18px] bg-emerald-600 px-3 py-3 text-center text-xs font-semibold text-white"
+                          >
+                            <CheckCircle2
+                              size={15}
+                            />
+                            Confirmar
+                          </Link>
+
+                          <Link
+                            href={`/mi-servicio/cambio?id=${assignment.id}`}
+                            className="flex items-center justify-center gap-1.5 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-3 text-center text-xs font-semibold text-amber-700"
+                          >
+                            <MessageCircle
+                              size={15}
+                            />
+
+                            {laterStatus ===
+                            "change_requested"
+                              ? "Editar cambio"
+                              : "Solicitar cambio"}
+                          </Link>
+                        </div>
+                      )}
+
+                      {laterStatus ===
+                      "confirmed" ? (
+                        <Link
+                          href={`/mi-servicio/cambio?id=${assignment.id}`}
+                          className="mt-2 flex items-center justify-center gap-1.5 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-3 text-center text-xs font-semibold text-amber-700"
+                        >
+                          <MessageCircle
+                            size={15}
+                          />
+                          Solicitar cambio
+                        </Link>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              }
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      {/* =====================================================
+          CHECKLIST DEL SERVICIO MÁS PRÓXIMO
       ====================================================== */}
 
       {checklistItems.length > 0 ? (
@@ -569,7 +796,7 @@ export default async function MiServicioPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-stone-500">
-                Marca cada tarea cuando la tengas lista.
+                Preparación para tu servicio más próximo.
               </p>
             </div>
 
@@ -584,8 +811,6 @@ export default async function MiServicioPage() {
               {checklistTotal}
             </span>
           </div>
-
-          {/* PROGRESO */}
 
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-100">
             <div
@@ -622,8 +847,6 @@ export default async function MiServicioPage() {
             )}
           </div>
 
-          {/* TODO COMPLETO */}
-
           {checklistComplete ? (
             <div className="mt-4 flex items-start gap-3 rounded-[22px] border border-emerald-100 bg-emerald-50 p-4 text-emerald-700">
               <CheckCircle2
@@ -637,8 +860,8 @@ export default async function MiServicioPage() {
                 </p>
 
                 <p className="mt-1 text-sm leading-5">
-                  Ya completaste todas las tareas de preparación de tu
-                  equipo.
+                  Ya completaste todas las tareas de preparación
+                  de tu equipo.
                 </p>
               </div>
             </div>
@@ -647,7 +870,7 @@ export default async function MiServicioPage() {
       ) : null}
 
       {/* =====================================================
-          EQUIPO
+          EQUIPO DEL SERVICIO MÁS PRÓXIMO
       ====================================================== */}
 
       {team.members?.length ? (
@@ -659,6 +882,10 @@ export default async function MiServicioPage() {
           <h2 className="mt-1 text-xl font-semibold text-stone-950">
             Servimos juntos
           </h2>
+
+          <p className="mt-1 text-sm text-stone-500">
+            Equipo de tu servicio más próximo.
+          </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             {team.members.map(

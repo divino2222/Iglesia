@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") || "/mi-cuenta";
+  const requestedNext = requestUrl.searchParams.get("next") || "/mi-cuenta";
 
   if (code) {
     const supabase = await createClient();
@@ -12,7 +12,17 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      /*
+       * Solo se permite regresar a una página de esta misma app.
+       * Evita redirecciones a sitios externos como "//otro-sitio.com".
+       */
+      const nextUrl = new URL(requestedNext, requestUrl.origin);
+      const safeNext =
+        nextUrl.origin === requestUrl.origin
+          ? `${nextUrl.pathname}${nextUrl.search}`
+          : "/mi-cuenta";
+
+      return NextResponse.redirect(new URL(safeNext, requestUrl.origin));
     }
   }
 

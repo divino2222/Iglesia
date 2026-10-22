@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { requirePermission } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendUserPush } from "@/lib/push/send-user-push";
 
@@ -18,6 +19,7 @@ function parseList(value: string) {
 }
 
 function revalidateServingPaths() {
+  revalidatePath("/admin");
   revalidatePath("/servir");
   revalidatePath("/admin/servir");
   revalidatePath("/mi-cuenta");
@@ -35,6 +37,8 @@ function getNextSundayDate(date: string) {
 ========================================================= */
 
 export async function updateServicePlan(formData: FormData) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const id = String(formData.get("id") || "");
@@ -92,6 +96,8 @@ export async function updateServicePlan(formData: FormData) {
 export async function updateServiceTeam(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const id = String(formData.get("id") || "");
@@ -220,7 +226,7 @@ export async function updateServiceTeam(
       data: server,
       error: serverError,
     } = await supabase
-      .from("servers")
+      .from("profiles")
       .select(
         `
         id,
@@ -303,7 +309,7 @@ export async function updateServiceTeam(
 
           body,
 
-          url: "/mi-cuenta",
+          url: "/mi-servicio",
 
           type: "service-assignment",
 
@@ -340,6 +346,13 @@ export async function updateServiceTeam(
 export async function linkProfileAccount(
   formData: FormData
 ) {
+  /*
+   * Vincular una cuenta con un perfil equivale a
+   * otorgarle el rol de ese perfil: solo quien
+   * administra usuarios puede hacerlo.
+   */
+  await requirePermission("users.manage");
+
   const supabase = createAdminClient();
 
   const profileId = String(
@@ -362,7 +375,7 @@ export async function linkProfileAccount(
 
   if (!authUserId) {
     const { error } = await supabase
-      .from("servers")
+      .from("profiles")
       .update({
         auth_user_id: null,
         email: null,
@@ -403,7 +416,7 @@ export async function linkProfileAccount(
    */
 
   const { error } = await supabase
-    .from("servers")
+    .from("profiles")
     .update({
       auth_user_id: authData.user.id,
       email: authData.user.email ?? null,
@@ -424,6 +437,8 @@ export async function linkProfileAccount(
 export async function keepAssignmentPending(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const assignmentId = String(
@@ -437,7 +452,7 @@ export async function keepAssignmentPending(
   }
 
   const { error } = await supabase
-    .from("service_assignments")
+    .from("assignments")
     .update({
       status: "pending",
     })
@@ -457,6 +472,8 @@ export async function keepAssignmentPending(
 export async function resolveAssignmentChange(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const assignmentId = String(
@@ -470,7 +487,7 @@ export async function resolveAssignmentChange(
   }
 
   const { error } = await supabase
-    .from("service_assignments")
+    .from("assignments")
     .update({
       status: "confirmed",
       note: null,
@@ -491,15 +508,17 @@ export async function resolveAssignmentChange(
 export async function reassignAssignment(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const assignmentId = String(
     formData.get("assignment_id") || ""
-  );
+  ).trim();
 
   const newProfileId = String(
     formData.get("new_profile_id") || ""
-  );
+  ).trim();
 
   if (!assignmentId || !newProfileId) {
     throw new Error(
@@ -508,57 +527,61 @@ export async function reassignAssignment(
   }
 
   /*
-   * Obtener asignación actual para conocer
-   * el equipo y poder notificar al reemplazo.
+   * =======================================================
+   * 1. ASIGNACIÓN ACTUAL
+   *
+   * IMPORTANTE:
+   * La app actual trabaja con la tabla `assignments`.
+   * =======================================================
    */
 
   const {
     data: assignment,
     error: assignmentError,
   } = await supabase
-    .from("service_assignments")
+    .from("assignments")
     .select(
       `
       id,
-      team_id
+      profile_id,
+      team_id,
+      service_plan_id,
+      status,
+      note
       `
     )
     .eq("id", assignmentId)
-    .single();
+    .maybeSingle();
 
   if (assignmentError) {
     throw new Error(
-      assignmentError.message
+      `No se pudo consultar la asignación: ${assignmentError.message}`
+    );
+  }
+
+  if (!assignment) {
+    throw new Error(
+      "La asignación ya no existe o no pertenece al sistema actual."
+    );
+  }
+
+  if (assignment.profile_id === newProfileId) {
+    throw new Error(
+      "Selecciona una persona diferente para realizar la reasignación."
     );
   }
 
   /*
-   * Actualizar persona.
-   */
-
-  const { error: updateError } =
-    await supabase
-      .from("service_assignments")
-      .update({
-        profile_id: newProfileId,
-        status: "pending",
-        note: null,
-      })
-      .eq("id", assignmentId);
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  /*
-   * Obtener nuevo servidor.
+   * =======================================================
+   * 2. PERSONA ACTUAL Y REEMPLAZO
+   * =======================================================
    */
 
   const {
-    data: newServer,
-    error: serverError,
+    data: profiles,
+    error: profilesError,
   } = await supabase
-    .from("servers")
+    .from("profiles")
     .select(
       `
       id,
@@ -566,106 +589,333 @@ export async function reassignAssignment(
       auth_user_id
       `
     )
-    .eq("id", newProfileId)
-    .maybeSingle();
+    .in("id", [
+      assignment.profile_id,
+      newProfileId,
+    ]);
 
-  if (serverError) {
-    console.error(
-      "REASSIGN SERVER ERROR:",
-      serverError
+  if (profilesError) {
+    throw new Error(
+      `No se pudieron consultar los perfiles: ${profilesError.message}`
+    );
+  }
+
+  const currentProfile =
+    (profiles ?? []).find(
+      (profile) =>
+        profile.id === assignment.profile_id
+    ) ?? null;
+
+  const newProfile =
+    (profiles ?? []).find(
+      (profile) =>
+        profile.id === newProfileId
+    ) ?? null;
+
+  if (!currentProfile) {
+    throw new Error(
+      "No se encontró el perfil de la persona asignada actualmente."
+    );
+  }
+
+  if (!newProfile) {
+    throw new Error(
+      "No se encontró el perfil de la persona seleccionada como reemplazo."
     );
   }
 
   /*
-   * Push al nuevo servidor,
-   * si tiene cuenta vinculada.
+   * =======================================================
+   * 3. EQUIPO
+   *
+   * También actualizamos leader_name / members para que
+   * la tarjeta del equipo y las asignaciones no se contradigan.
+   * =======================================================
    */
 
-  if (newServer?.auth_user_id) {
-    const {
-      data: team,
-    } = await supabase
-      .from("service_teams")
-      .select(
-        `
-        id,
-        team_name,
-        arrival_time,
-        service_plan_id
-        `
-      )
-      .eq("id", assignment.team_id)
-      .maybeSingle();
+  const {
+    data: team,
+    error: teamError,
+  } = await supabase
+    .from("service_teams")
+    .select(
+      `
+      id,
+      team_name,
+      leader_name,
+      members,
+      arrival_time,
+      service_plan_id
+      `
+    )
+    .eq("id", assignment.team_id)
+    .maybeSingle();
 
+  if (teamError) {
+    throw new Error(
+      `No se pudo consultar el equipo: ${teamError.message}`
+    );
+  }
+
+  if (!team) {
+    throw new Error(
+      "No se encontró el equipo de esta asignación."
+    );
+  }
+
+  const currentMembers =
+    Array.isArray(team.members)
+      ? team.members
+          .map((name) => String(name).trim())
+          .filter(Boolean)
+      : [];
+
+  const currentWasLeader =
+    team.leader_name?.trim() ===
+    currentProfile.full_name.trim();
+
+  let nextLeaderName =
+    team.leader_name ?? null;
+
+  let nextMembers =
+    [...currentMembers];
+
+  if (currentWasLeader) {
+    nextLeaderName =
+      newProfile.full_name;
+
+    nextMembers =
+      nextMembers.map((name) =>
+        name === currentProfile.full_name
+          ? newProfile.full_name
+          : name
+      );
+  } else {
+    nextMembers =
+      nextMembers
+        .filter(
+          (name) =>
+            name !==
+            currentProfile.full_name
+        )
+        .concat(
+          newProfile.full_name
+        );
+  }
+
+  nextMembers =
+    Array.from(
+      new Set(
+        nextMembers
+          .map((name) => name.trim())
+          .filter(Boolean)
+      )
+    );
+
+  const {
+    error: teamUpdateError,
+  } = await supabase
+    .from("service_teams")
+    .update({
+      leader_name:
+        nextLeaderName,
+
+      members:
+        nextMembers,
+
+      /*
+       * Una reasignación necesita nueva confirmación.
+       */
+      status: "pending",
+    })
+    .eq("id", team.id);
+
+  if (teamUpdateError) {
+    throw new Error(
+      `No se pudo actualizar el equipo: ${teamUpdateError.message}`
+    );
+  }
+
+  /*
+   * =======================================================
+   * 4. EVITAR ASIGNACIONES DUPLICADAS
+   * =======================================================
+   */
+
+  const {
+    data: existingReplacement,
+    error: existingReplacementError,
+  } = await supabase
+    .from("assignments")
+    .select("id")
+    .eq(
+      "service_plan_id",
+      assignment.service_plan_id
+    )
+    .eq(
+      "team_id",
+      assignment.team_id
+    )
+    .eq(
+      "profile_id",
+      newProfileId
+    )
+    .maybeSingle();
+
+  if (existingReplacementError) {
+    throw new Error(
+      `No se pudo comprobar la asignación del reemplazo: ${existingReplacementError.message}`
+    );
+  }
+
+  if (existingReplacement) {
+    /*
+     * El reemplazo ya estaba en el mismo equipo.
+     * Eliminamos la asignación vieja y dejamos
+     * la existente pendiente de confirmación.
+     */
+    const {
+      error: deleteOldError,
+    } = await supabase
+      .from("assignments")
+      .delete()
+      .eq("id", assignment.id);
+
+    if (deleteOldError) {
+      throw new Error(
+        `No se pudo retirar la asignación anterior: ${deleteOldError.message}`
+      );
+    }
+
+    const {
+      error: resetReplacementError,
+    } = await supabase
+      .from("assignments")
+      .update({
+        status: "pending",
+        note: null,
+      })
+      .eq(
+        "id",
+        existingReplacement.id
+      );
+
+    if (resetReplacementError) {
+      throw new Error(
+        `No se pudo preparar la asignación del reemplazo: ${resetReplacementError.message}`
+      );
+    }
+  } else {
+    /*
+     * El reemplazo todavía no estaba en el equipo:
+     * reutilizamos la misma asignación y cambiamos
+     * únicamente profile_id.
+     */
+    const {
+      error: updateAssignmentError,
+    } = await supabase
+      .from("assignments")
+      .update({
+        profile_id:
+          newProfileId,
+
+        status:
+          "pending",
+
+        note:
+          null,
+      })
+      .eq("id", assignment.id);
+
+    if (updateAssignmentError) {
+      throw new Error(
+        `No se pudo reasignar el servicio: ${updateAssignmentError.message}`
+      );
+    }
+  }
+
+  /*
+   * =======================================================
+   * 5. NOTIFICACIÓN PUSH AL REEMPLAZO
+   * =======================================================
+   */
+
+  if (newProfile.auth_user_id) {
     let dateLabel =
       "el próximo servicio";
 
-    if (team?.service_plan_id) {
-      const {
-        data: servicePlan,
-      } = await supabase
-        .from("service_plans")
-        .select("service_date")
-        .eq(
-          "id",
-          team.service_plan_id
-        )
-        .maybeSingle();
+    const {
+      data: servicePlan,
+    } = await supabase
+      .from("service_plans")
+      .select("service_date")
+      .eq(
+        "id",
+        assignment.service_plan_id
+      )
+      .maybeSingle();
 
-      if (servicePlan?.service_date) {
-        dateLabel =
-          new Intl.DateTimeFormat(
-            "es-MX",
-            {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              timeZone:
-                "America/Mexico_City",
-            }
-          ).format(
-            new Date(
-              `${servicePlan.service_date}T12:00:00`
-            )
-          );
-      }
+    if (servicePlan?.service_date) {
+      dateLabel =
+        new Intl.DateTimeFormat(
+          "es-MX",
+          {
+            weekday:
+              "long",
+
+            day:
+              "numeric",
+
+            month:
+              "long",
+
+            timeZone:
+              "America/Mexico_City",
+          }
+        ).format(
+          new Date(
+            `${servicePlan.service_date}T12:00:00`
+          )
+        );
     }
 
     try {
       await sendUserPush({
         authUserId:
-          newServer.auth_user_id,
+          newProfile.auth_user_id,
 
         title:
           "🤝 Nueva asignación",
 
         body:
-          `${newServer.full_name}, has sido asignado al equipo de ${
-            team?.team_name ||
-            "servicio"
-          } para ${dateLabel}.` +
-          (team?.arrival_time
+          `${newProfile.full_name}, has sido asignado al equipo de ${team.team_name} para ${dateLabel}.` +
+          (team.arrival_time
             ? ` Llegada: ${team.arrival_time}.`
             : ""),
 
-        url: "/mi-cuenta",
+        url:
+          "/mi-servicio",
 
         type:
           "service-reassignment",
 
         entityType:
-          "service_assignment",
+          "assignment",
 
         entityId:
-          assignmentId,
+          existingReplacement?.id ??
+          assignment.id,
 
         dedupeKey:
-          `service-reassignment-${assignmentId}-${newServer.auth_user_id}-${Date.now()}`,
+          `service-reassignment-${assignment.id}-${newProfile.auth_user_id}-${Date.now()}`,
 
         tag:
-          `service-reassignment-${assignmentId}`,
+          `service-reassignment-${assignment.id}`,
       });
     } catch (pushError) {
+      /*
+       * Una falla Push no debe revertir la reasignación.
+       */
       console.error(
         "REASSIGNMENT PUSH ERROR:",
         pushError
@@ -683,34 +933,17 @@ export async function reassignAssignment(
 export async function createNextSundayPlan(
   formData: FormData
 ) {
+  await requirePermission("dashboard.view");
+
   const supabase = createAdminClient();
 
   const currentPlanId = String(
     formData.get("plan_id") || ""
-  );
-
-  const adminPin = String(
-    formData.get("admin_pin") || ""
-  );
+  ).trim();
 
   if (!currentPlanId) {
     throw new Error(
       "No se recibió el plan actual."
-    );
-  }
-
-  /*
-   * Validamos el PIN porque esta acción
-   * crea información nueva.
-   */
-
-  if (
-    !process.env.SERVING_ADMIN_PIN ||
-    adminPin !==
-      process.env.SERVING_ADMIN_PIN
-  ) {
-    throw new Error(
-      "No autorizado para crear un nuevo domingo."
     );
   }
 
@@ -739,15 +972,24 @@ export async function createNextSundayPlan(
       `
     )
     .eq("id", currentPlanId)
-    .single();
+    .maybeSingle();
 
   if (planError) {
-    throw new Error(planError.message);
+    throw new Error(
+      `No se pudo consultar el plan actual: ${planError.message}`
+    );
   }
 
-  const nextDate = getNextSundayDate(
-    currentPlan.service_date
-  );
+  if (!currentPlan) {
+    throw new Error(
+      "No se encontró el plan actual."
+    );
+  }
+
+  const nextDate =
+    getNextSundayDate(
+      currentPlan.service_date
+    );
 
   /*
    * =======================================================
@@ -761,12 +1003,15 @@ export async function createNextSundayPlan(
   } = await supabase
     .from("service_plans")
     .select("id")
-    .eq("service_date", nextDate)
+    .eq(
+      "service_date",
+      nextDate
+    )
     .maybeSingle();
 
   if (existingError) {
     throw new Error(
-      existingError.message
+      `No se pudo verificar el próximo domingo: ${existingError.message}`
     );
   }
 
@@ -774,9 +1019,7 @@ export async function createNextSundayPlan(
     revalidateServingPaths();
 
     redirect(
-      `/admin/servir?pin=${encodeURIComponent(
-        adminPin
-      )}&plan=${encodeURIComponent(
+      `/admin/servir?plan=${encodeURIComponent(
         existingPlan.id
       )}`
     );
@@ -798,7 +1041,8 @@ export async function createNextSundayPlan(
         currentPlan.title ||
         "Servicio dominical",
 
-      service_date: nextDate,
+      service_date:
+        nextDate,
 
       service_time:
         currentPlan.service_time,
@@ -818,14 +1062,21 @@ export async function createNextSundayPlan(
       notes:
         currentPlan.notes,
 
-      status: "pending",
+      status:
+        "pending",
     })
     .select("id")
     .single();
 
-  if (newPlanError) {
+  if (
+    newPlanError ||
+    !newPlan
+  ) {
     throw new Error(
-      newPlanError.message
+      `No se pudo crear el próximo domingo: ${
+        newPlanError?.message ||
+        "No se creó el plan."
+      }`
     );
   }
 
@@ -855,8 +1106,13 @@ export async function createNextSundayPlan(
     );
 
   if (teamsError) {
+    await supabase
+      .from("service_plans")
+      .delete()
+      .eq("id", newPlan.id);
+
     throw new Error(
-      teamsError.message
+      `No se pudieron consultar los equipos actuales: ${teamsError.message}`
     );
   }
 
@@ -865,43 +1121,44 @@ export async function createNextSundayPlan(
     currentTeams.length > 0
   ) {
     const copiedTeams =
-      currentTeams.map((team) => ({
-        service_plan_id:
-          newPlan.id,
+      currentTeams.map(
+        (team) => ({
+          service_plan_id:
+            newPlan.id,
 
-        team_name:
-          team.team_name,
+          team_name:
+            team.team_name,
 
-        emoji:
-          team.emoji,
+          emoji:
+            team.emoji,
 
-        /*
-         * Por diseño:
-         * próximo domingo empieza
-         * sin responsable.
-         */
-        leader_name: null,
+          /*
+           * El nuevo domingo comienza
+           * sin responsable.
+           */
+          leader_name:
+            null,
 
-        arrival_time:
-          team.arrival_time,
+          arrival_time:
+            team.arrival_time,
 
-        service_time:
-          team.service_time,
+          service_time:
+            team.service_time,
 
-        status: "pending",
+          status:
+            "pending",
 
-        /*
-         * Y sin integrantes asignados.
-         */
-        members: [],
+          /*
+           * También comienza sin integrantes.
+           */
+          members:
+            [],
 
-        /*
-         * Sí conservamos las tareas
-         * de cada ministerio.
-         */
-        checklist:
-          team.checklist ?? [],
-      }));
+          checklist:
+            team.checklist ??
+            [],
+        })
+      );
 
     const {
       error: insertTeamsError,
@@ -910,23 +1167,26 @@ export async function createNextSundayPlan(
       .insert(copiedTeams);
 
     if (insertTeamsError) {
+      /*
+       * Si falla la copia de equipos,
+       * retiramos el plan recién creado
+       * para no dejar un domingo incompleto.
+       */
+      await supabase
+        .from("service_plans")
+        .delete()
+        .eq("id", newPlan.id);
+
       throw new Error(
-        insertTeamsError.message
+        `No se pudieron copiar los equipos: ${insertTeamsError.message}`
       );
     }
   }
 
   revalidateServingPaths();
 
-  /*
-   * Abrir automáticamente el
-   * domingo recién creado.
-   */
-
   redirect(
-    `/admin/servir?pin=${encodeURIComponent(
-      adminPin
-    )}&plan=${encodeURIComponent(
+    `/admin/servir?plan=${encodeURIComponent(
       newPlan.id
     )}`
   );

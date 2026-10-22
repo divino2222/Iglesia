@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { getCurrentAccess } from "@/lib/auth/permissions";
 import { getPrayerLeaderState } from "@/lib/prayer-leader";
 import { buildPrayerPushMessage } from "@/lib/push-message-builder";
 
@@ -46,7 +47,36 @@ function getAdminSupabase() {
   };
 }
 
-export async function POST() {
+/*
+ * Envía a TODOS los dispositivos suscritos.
+ * Solo puede llamarlo el cron (CRON_SECRET)
+ * o un administrador con sesión iniciada.
+ */
+async function isAuthorized(request: Request) {
+  const secret = process.env.CRON_SECRET;
+
+  if (
+    secret &&
+    request.headers.get("authorization") === `Bearer ${secret}`
+  ) {
+    return true;
+  }
+
+  const access = await getCurrentAccess();
+
+  return Boolean(
+    access?.permissions.includes("settings.manage")
+  );
+}
+
+export async function POST(request: Request) {
+  if (!(await isAuthorized(request))) {
+    return NextResponse.json(
+      { ok: false, error: "No autorizado." },
+      { status: 401 }
+    );
+  }
+
   try {
     const vapid = configureWebPush();
     if (!vapid.ok) {

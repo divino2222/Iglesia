@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { logActivity } from "@/lib/activity-log";
+import { requirePermission } from "@/lib/auth/permissions";
 import {
   sendProfilePushNotification,
 } from "@/lib/push-notifications";
@@ -289,20 +290,11 @@ async function enqueueAndSendProfilePush({
 export async function reviewAssignment(
   formData: FormData
 ) {
+  await requirePermission(
+    "change_requests.manage"
+  );
+
   const admin = createAdminClient();
-
-  const pin = String(
-    formData.get("pin") || ""
-  ).trim();
-
-  const validPin =
-    process.env.SERVING_ADMIN_PIN;
-
-  if (!validPin || pin !== validPin) {
-    throw new Error(
-      "No tienes autorización para realizar esta acción."
-    );
-  }
 
   const assignmentId = String(
     formData.get("assignment_id") || ""
@@ -1407,9 +1399,5 @@ export async function reviewAssignment(
     assignmentId
   );
 
-  redirect(
-    `/admin?pin=${encodeURIComponent(
-      pin
-    )}`
-  );
+  redirect("/admin");
 }

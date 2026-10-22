@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
+import { getCurrentAccess } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type RequestBody = {
   email?: string;
-  pin?: string;
 };
 
 type PushSubscriptionRow = {
@@ -33,29 +33,21 @@ export async function POST(request: Request) {
     const body = (await request.json()) as RequestBody;
 
     const email = body.email?.trim().toLowerCase();
-    const pin = body.pin?.trim();
 
     /*
      * =====================================================
      * 1. PROTEGER ESTA RUTA DE PRUEBA
+     * Solo administradores con sesión iniciada.
      * =====================================================
      */
 
-    if (!process.env.SERVING_ADMIN_PIN) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "SERVING_ADMIN_PIN no está configurado.",
-        },
-        { status: 500 }
-      );
-    }
+    const access = await getCurrentAccess();
 
-    if (pin !== process.env.SERVING_ADMIN_PIN) {
+    if (!access?.permissions.includes("settings.manage")) {
       return NextResponse.json(
         {
           ok: false,
-          error: "PIN incorrecto.",
+          error: "No autorizado.",
         },
         { status: 401 }
       );
@@ -82,7 +74,7 @@ export async function POST(request: Request) {
      */
 
     const { data: server, error: serverError } = await supabase
-      .from("servers")
+      .from("profiles")
       .select("id,full_name,email,auth_user_id")
       .ilike("email", email)
       .maybeSingle();
@@ -101,7 +93,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: `No encontré un servidor con el correo ${email}.`,
+          error: `No encontré un perfil con el correo ${email}.`,
         },
         { status: 404 }
       );
