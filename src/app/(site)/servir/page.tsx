@@ -157,8 +157,7 @@ export default async function ServirPage() {
    */
   const shouldShowServingDashboard =
     Boolean(user) &&
-    Boolean(profile) &&
-    profile.is_active &&
+    profile?.is_active === true &&
     (hasMinistry ||
       hasServerRole);
 

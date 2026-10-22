@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { logActivity } from "@/lib/activity-log";
+import { requirePermission } from "@/lib/auth/permissions";
 import {
   sendProfilePushNotification,
 } from "@/lib/push-notifications";
@@ -289,6 +290,10 @@ async function enqueueAndSendProfilePush({
 export async function reviewAssignment(
   formData: FormData
 ) {
+  await requirePermission(
+    "change_requests.manage"
+  );
+
   const admin = createAdminClient();
 
   const pin = String(

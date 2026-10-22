@@ -46,7 +46,27 @@ function getAdminSupabase() {
   };
 }
 
-export async function POST() {
+function isAuthorized(request: Request) {
+  const secret = process.env.CRON_SECRET;
+
+  if (!secret) {
+    return false;
+  }
+
+  return (
+    request.headers.get("authorization") ===
+    `Bearer ${secret}`
+  );
+}
+
+export async function POST(request: Request) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { ok: false, error: "No autorizado." },
+      { status: 401 }
+    );
+  }
+
   try {
     const vapid = configureWebPush();
     if (!vapid.ok) {
