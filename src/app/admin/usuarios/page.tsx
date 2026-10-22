@@ -49,7 +49,8 @@ function isRoleName(
     value === "team_leader" ||
     value === "server" ||
     value === "pastor" ||
-    value === "new_volunteer"
+    value === "new_volunteer" ||
+    value === "member"
   );
 }
 
