@@ -34,6 +34,8 @@ type LoginFormProps = {
    VALIDAR DESTINO INTERNO
 
    Evita aceptar destinos externos.
+   Devuelve null si no hay destino: se usará
+   la ruta inicial del rol.
 ========================================================= */
 
 function getSafeNextPath(
@@ -44,10 +46,46 @@ function getSafeNextPath(
     !next.startsWith("/") ||
     next.startsWith("//")
   ) {
-    return "/mi-cuenta";
+    return null;
   }
 
   return next;
+}
+
+/* =========================================================
+   RUTA INICIAL SEGÚN ROL
+
+   Si falla, /mi-cuenta funciona para cualquier
+   sesión activa.
+========================================================= */
+
+async function fetchDefaultRoute() {
+  try {
+    const response =
+      await fetch(
+        "/api/auth/default-route",
+        {
+          cache: "no-store",
+        }
+      );
+
+    if (!response.ok) {
+      return "/mi-cuenta";
+    }
+
+    const data =
+      (await response.json()) as {
+        route?: string;
+      };
+
+    return (
+      getSafeNextPath(
+        data.route
+      ) ?? "/mi-cuenta"
+    );
+  } catch {
+    return "/mi-cuenta";
+  }
 }
 
 /* =========================================================
@@ -94,9 +132,11 @@ export default function LoginForm({
    * el destino.
    */
   const registerHref =
-    `/registro?next=${encodeURIComponent(
-      nextPath
-    )}`;
+    nextPath
+      ? `/registro?next=${encodeURIComponent(
+          nextPath
+        )}`
+      : "/registro";
 
   /* =======================================================
      LOGIN
@@ -173,10 +213,13 @@ export default function LoginForm({
          /login?next=/servir/solicitud?ministerio=alabanza
 
          y regresará ahí.
+
+         Sin destino, va a la ruta inicial de su rol.
       =================================================== */
 
       router.replace(
-        nextPath
+        nextPath ??
+          (await fetchDefaultRoute())
       );
 
       router.refresh();
